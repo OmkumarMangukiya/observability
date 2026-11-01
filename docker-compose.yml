@@ -1,0 +1,3 @@
+version: '3.9'
+# TODO: fill in services for Prometheus, Loki, Tempo, Grafana Alloy, Alertmanager, and demo microservices
+services: {}
