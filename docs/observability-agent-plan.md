@@ -21,7 +21,7 @@ There are two learning goals alongside the product goal:
 | Local environment | Docker Compose first; Kubernetes (kind/minikube) only later |
 | Dev environment | WSL2 (Linux), chosen because most production systems are Unix-based; Docker used from inside WSL |
 | Repo | Folder `observability/` inside the WSL filesystem, tracked with git; moving to native Linux later is just a clone |
-| Demo services | New, purpose-built toy services (not reusing Continew) |
+| Demo services | New, purpose-built toy services |
 | Instrumentation standard | OpenTelemetry (vendor-neutral, so any app can plug in) |
 | Agent autonomy | Read-only first; no auto-remediation until much later |
 
@@ -62,10 +62,6 @@ observability/
   docs/                notes and decisions
   .claude/agents/      subagents, added later
 ```
-
-WSL notes:
-- Keep the repo in the WSL home directory (e.g. `~/observability`), not under `/mnt/c/...`. Cross-filesystem access is slow and causes permission and file-watching problems with Docker bind mounts.
-- Docker must work from inside WSL: either Docker Desktop with WSL integration enabled, or Docker Engine installed directly in the WSL distro. Check with `docker compose version` inside WSL.
 
 ## 5. Observability concepts to understand
 
@@ -154,18 +150,3 @@ Keep a table of scenario vs result over time. This is what makes the project cre
 - Skills, slash commands and hooks: add when a task repeats.
 - MCP servers: connect Claude Code to Prometheus or Loki as a preview of what the agent does.
 - Plan mode and small reviewable tasks; read diffs rather than accepting blindly.
-
-## 11. Working agreements for Claude in this project
-
-- Explain the concept briefly before using it; the user is learning this stack.
-- Prefer small, runnable steps over large dumps; each step should end with something verifiable.
-- Keep to the decisions in section 2 unless there is a strong reason; flag it if so.
-- Python code with type hints; pin versions in compose and requirements.
-- Never put secrets in files that get committed.
-
-## 12. Status
-
-- 2026-11-01: brainstorm done, decisions in section 2 made (including WSL2 and fresh toy services), local `observability/` git folder created. No code yet.
-- Next: generate starter files (repo layout, `CLAUDE.md`, `docker-compose.yml` with Prometheus, Loki, Tempo, Alloy and Grafana, first FastAPI service), then build Milestone 1.
-
-Update this section at each milestone so later chats start from the right place.
