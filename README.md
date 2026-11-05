@@ -84,3 +84,6 @@ observability/
 
 ## 🗺️ Roadmap & Detailed Plan
 See [`docs/observability-agent-plan.md`](docs/observability-agent-plan.md) for detailed architecture, phased milestones, concepts, and eval designs.
+
+## 📄 License
+[MIT](LICENSE) © 2026 OmkumarMangukiya
