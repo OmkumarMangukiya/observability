@@ -48,7 +48,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | Step | Scope | Status |
 |---|---|---|
 | M1.1 | Scaffolding & test harness | ✅ |
-| M1.2 | Structured logging | ⬜ |
+| M1.2 | Structured logging | ✅ |
 | M1.3 | Metrics + request middleware | ⬜ |
 | M1.4 | Tracing wiring | ⬜ |
 | M1.5 | Orders service | ⬜ |
@@ -64,7 +64,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** harness only — `pytest -q` collects cleanly.
 - **Done when:** `pip install -r requirements-dev.txt` succeeds; `pytest -q` exits 0; `ruff check .` clean.
 
-### M1.2 — Structured logging ⬜
+### M1.2 — Structured logging ✅
 - **Build:** `services/common/logging.py` — structlog JSON to stdout with ISO-8601 UTC timestamp, level, event, `service`, `trace_id`, `span_id`; configured once. IDs are zero-padded 32/16 hex from the active span, `None` outside a span.
 - **Tests:** `tests/test_logging.py`.
 - **Done when:** tests pass; output parses as JSON.
@@ -128,7 +128,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - [x] Phase 0: observability concepts
 
 ## In flight / Next
-- [ ] **M1.2 — Structured logging** (start here)
+- [ ] **M1.3 — Metrics + request middleware** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.
