@@ -7,8 +7,8 @@ tools (PromQL, LogQL, TraceQL), feeds back execution results, and terminates wit
 a structured root-cause incident report.
 """
 
-from typing import Any, Dict, List, Optional
 import os
+from typing import Any
 
 
 class ObservabilityAgentLoop:
@@ -16,16 +16,16 @@ class ObservabilityAgentLoop:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "claude-3-5-sonnet-20241022",
         max_steps: int = 15,
     ) -> None:
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self.model = model
         self.max_steps = max_steps
-        self.messages: List[Dict[str, Any]] = []
+        self.messages: list[dict[str, Any]] = []
 
-    def run_investigation(self, alert_context: Dict[str, Any]) -> Dict[str, Any]:
+    def run_investigation(self, alert_context: dict[str, Any]) -> dict[str, Any]:
         """
         Run the multi-turn investigation loop given an alert.
 

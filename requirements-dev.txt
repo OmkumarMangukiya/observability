@@ -1,0 +1,8 @@
+# Local development and test tooling. Never installed into the Docker image.
+# Usage (from the repo root): pip install -r requirements-dev.txt
+
+-r services/requirements.txt
+
+pytest==9.2.0
+PyYAML==6.0.3
+ruff==0.17.3
