@@ -69,4 +69,8 @@ ruff check . && ruff format .   # lint + format
 4. **Follow the plan.** Adhere to decisions in `docs/observability-agent-plan.md` unless explicitly discussed.
 5. **No secrets in code.** Use `.env` / `.env.example`. Never commit credentials.
 6. **Beginner-friendly tone.** Talk like a friend explaining to a beginner: short, plain, informal English, straight to the point, and explain any jargon in a few words.
-7. **Plan before coding.** Before touching files, briefly explain what is changing, how it works, why this approach, and preview critical code.
+7. **Plan before coding.** Before creating, editing, or deleting any file:
+   - Explain what will change, how it works, and why this approach.
+   - Show the critical code you plan to write.
+   - Stop and wait for my explicit approval (e.g. "go ahead") before making any file changes.
+   - Do not call Edit, Write, or any file-modifying command until I approve.
