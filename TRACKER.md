@@ -1,4 +1,4 @@
-# Tracker — last updated 2026-11-05
+# Tracker — last updated 2026-11-08
 
 ## Phase status
 | Phase | Name | Status |
@@ -49,7 +49,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 |---|---|---|
 | M1.1 | Scaffolding & test harness | ✅ |
 | M1.2 | Structured logging | ✅ |
-| M1.3 | Metrics + request middleware | ⬜ |
+| M1.3 | Metrics + request middleware | ✅ |
 | M1.4 | Tracing wiring | ⬜ |
 | M1.5 | Orders service | ⬜ |
 | M1.6 | Gateway service | ⬜ |
@@ -69,7 +69,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** `tests/test_logging.py`.
 - **Done when:** tests pass; output parses as JSON.
 
-### M1.3 — Metrics + request middleware ⬜
+### M1.3 — Metrics + request middleware ✅
 - **Build:** `services/common/telemetry.py` metrics half — Resource (`service.name`, `deployment.environment`), MeterProvider + PrometheusMetricReader, instruments `http.server.request.duration` (unit s) and `http.server.requests`, mount `prometheus_client.make_asgi_app()` at `/metrics`; `services/common/middleware.py` — records service/method/route/status/duration, route template from `scope["route"]` with `unmatched` fallback, skips `/metrics` and `/healthz`, logs one `request_completed` line, records 500 and re-raises on exceptions. Idempotent per process.
 - **Tests:** `tests/test_metrics.py` — counter and histogram exist with the contract labels; `/metrics` returns Prometheus text; `/metrics` and `/healthz` requests do not increment; a second init does not duplicate series.
 - **Done when:** tests pass.
@@ -128,7 +128,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - [x] Phase 0: observability concepts
 
 ## In flight / Next
-- [ ] **M1.3 — Metrics + request middleware** (start here)
+- [ ] **M1.4 — Tracing wiring** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.
