@@ -68,4 +68,5 @@ ruff check . && ruff format .   # lint + format
 3. **Surgical changes.** Touch only code required by the task. Don't refactor adjacent code/comments or formatting.
 4. **Follow the plan.** Adhere to decisions in `docs/observability-agent-plan.md` unless explicitly discussed.
 5. **No secrets in code.** Use `.env` / `.env.example`. Never commit credentials.
-6. Talk like a friend explaining to a beginner: short, plain, informal English, straight to the point, and explain any jargon in a few words.
+6. **Beginner-friendly tone.** Talk like a friend explaining to a beginner: short, plain, informal English, straight to the point, and explain any jargon in a few words.
+7. **Plan before coding.** Before touching files, briefly explain what is changing, how it works, why this approach, and preview critical code.
