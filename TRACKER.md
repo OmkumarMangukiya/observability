@@ -1,4 +1,4 @@
-# Tracker — last updated 2026-11-08
+# Tracker — last updated 2026-11-09
 
 ## Phase status
 | Phase | Name | Status |
@@ -50,7 +50,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | M1.1 | Scaffolding & test harness | ✅ |
 | M1.2 | Structured logging | ✅ |
 | M1.3 | Metrics + request middleware | ✅ |
-| M1.4 | Tracing wiring | ⬜ |
+| M1.4 | Tracing wiring | ✅ |
 | M1.5 | Orders service | ⬜ |
 | M1.6 | Gateway service | ⬜ |
 | M1.7 | Containerize the two services | ⬜ |
@@ -74,7 +74,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** `tests/test_metrics.py` — counter and histogram exist with the contract labels; `/metrics` returns Prometheus text; `/metrics` and `/healthz` requests do not increment; a second init does not duplicate series.
 - **Done when:** tests pass.
 
-### M1.4 — Tracing wiring ⬜
+### M1.4 — Tracing wiring ✅
 - **Build:** extend `telemetry.py` — TracerProvider with the Resource, BatchSpanProcessor + OTLP/HTTP exporter only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; `FastAPIInstrumentor.instrument_app(app)` called last so the server span is outermost; idempotent per process.
 - **Tests:** `tests/test_tracing.py` — handler sees a valid span whose trace ID matches the log; an httpx call made inside a span carries `traceparent`; no OTLP exporter when the endpoint env var is empty.
 - **Done when:** tests pass.
@@ -128,7 +128,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - [x] Phase 0: observability concepts
 
 ## In flight / Next
-- [ ] **M1.4 — Tracing wiring** (start here)
+- [ ] **M1.5 — Orders service** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.
