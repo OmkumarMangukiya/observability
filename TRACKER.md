@@ -51,7 +51,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | M1.2 | Structured logging | ✅ |
 | M1.3 | Metrics + request middleware | ✅ |
 | M1.4 | Tracing wiring | ✅ |
-| M1.5 | Orders service | ⬜ |
+| M1.5 | Orders service | ✅ |
 | M1.6 | Gateway service | ⬜ |
 | M1.7 | Containerize the two services | ⬜ |
 | M1.8 | Prometheus + Grafana datasource | ⬜ |
@@ -79,7 +79,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** `tests/test_tracing.py` — handler sees a valid span whose trace ID matches the log; an httpx call made inside a span carries `traceparent`; no OTLP exporter when the endpoint env var is empty.
 - **Done when:** tests pass.
 
-### M1.5 — Orders service ⬜
+### M1.5 — Orders service ✅
 - **Build:** `services/orders/main.py` — in-memory orders; `GET /orders`, `GET /orders/{id}` (404 for unknown), `GET /healthz`; `init_observability(app, "orders")`.
 - **Tests:** `tests/test_orders.py` — list 200, unknown id 404, healthz 200, metrics carry `service_name="orders"`.
 - **Done when:** tests pass.
@@ -128,7 +128,8 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - [x] Phase 0: observability concepts
 
 ## In flight / Next
-- [ ] **M1.5 — Orders service** (start here)
+- [x] **M1.5 — Orders service**
+- [ ] **M1.6 — Gateway service** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.
