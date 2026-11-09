@@ -52,7 +52,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | M1.3 | Metrics + request middleware | ✅ |
 | M1.4 | Tracing wiring | ✅ |
 | M1.5 | Orders service | ✅ |
-| M1.6 | Gateway service | ⬜ |
+| M1.6 | Gateway service | ✅ |
 | M1.7 | Containerize the two services | ⬜ |
 | M1.8 | Prometheus + Grafana datasource | ⬜ |
 | M1.9 | Loki + Alloy logs | ⬜ |
@@ -84,7 +84,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** `tests/test_orders.py` — list 200, unknown id 404, healthz 200, metrics carry `service_name="orders"`.
 - **Done when:** tests pass.
 
-### M1.6 — Gateway service ⬜
+### M1.6 — Gateway service ✅
 - **Build:** `services/gateway/main.py` — lifespan-owned `httpx.Client` (`ORDERS_URL=http://orders:8001`) exposed as a dependency for test overrides; `GET /orders`, `GET /orders/{id}` pass 4xx through and map transport errors to 502; `GET /healthz`; structured `orders_call_failed` log on error.
 - **Tests:** `tests/test_gateway.py` — proxy success, 404 passthrough, `httpx.ConnectError` → 502, `traceparent` forwarded on the outgoing request.
 - **Done when:** tests pass.
@@ -129,7 +129,8 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 
 ## In flight / Next
 - [x] **M1.5 — Orders service**
-- [ ] **M1.6 — Gateway service** (start here)
+- [x] **M1.6 — Gateway service**
+- [ ] **M1.7 — Containerize the two services** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.

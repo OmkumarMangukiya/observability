@@ -1,11 +1,23 @@
 """Tests for structured logging (M1.2)."""
 
 import json
+from collections.abc import Iterator
 from datetime import datetime, timedelta
 
+import pytest
 from opentelemetry.sdk.trace import TracerProvider
 
+from common import logging as common_logging
 from common.logging import configure_logging, get_logger
+
+
+@pytest.fixture(autouse=True)
+def reset_logging_config() -> Iterator[None]:
+    """Clear the process-wide "configure once" flag so each test sets its own service."""
+    # Other test modules import service apps, which configure logging at import time.
+    common_logging._configured = False
+    yield
+    common_logging._configured = False
 
 
 def _logged_events(captured: str) -> list[dict[str, object]]:
