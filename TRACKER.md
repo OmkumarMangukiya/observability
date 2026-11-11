@@ -1,4 +1,4 @@
-# Tracker — last updated 2026-11-09
+# Tracker — last updated 2026-11-11
 
 ## Phase status
 | Phase | Name | Status |
@@ -53,7 +53,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | M1.4 | Tracing wiring | ✅ |
 | M1.5 | Orders service | ✅ |
 | M1.6 | Gateway service | ✅ |
-| M1.7 | Containerize the two services | ⬜ |
+| M1.7 | Containerize the two services | ✅ |
 | M1.8 | Prometheus + Grafana datasource | ⬜ |
 | M1.9 | Loki + Alloy logs | ⬜ |
 | M1.10 | Tempo + Alloy traces | ⬜ |
@@ -89,7 +89,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** `tests/test_gateway.py` — proxy success, 404 passthrough, `httpx.ConnectError` → 502, `traceparent` forwarded on the outgoing request.
 - **Done when:** tests pass.
 
-### M1.7 — Containerize the two services ⬜
+### M1.7 — Containerize the two services ✅
 - **Build:** `services/Dockerfile` (`python:3.11-slim-bookworm`, install requirements, `PYTHONPATH=/app`, copy `common/`, `gateway/`, `orders/`), `services/.dockerignore`, compose entries for gateway and orders (shared build, per-service command/port, `uvicorn --no-access-log`, `OTEL_SERVICE_NAME`, `LOG_LEVEL`); `scripts/smoke.sh` phase 1.
 - **Verify:** `docker compose up -d --build`; `curl -s localhost:8000/orders` → 200; `curl -s localhost:8000/orders/999` → 404; `scripts/smoke.sh` phase 1.
 - **Done when:** `scripts/smoke.sh` phase 1 passes — the synthesised trace ID appears in both services' logs. First Docker-dependent step.
@@ -130,7 +130,8 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 ## In flight / Next
 - [x] **M1.5 — Orders service**
 - [x] **M1.6 — Gateway service**
-- [ ] **M1.7 — Containerize the two services** (start here)
+- [x] **M1.7 — Containerize the two services**
+- [ ] **M1.8 — Prometheus + Grafana datasource** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.

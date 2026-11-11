@@ -1,3 +1,29 @@
-version: '3.9'
-# TODO: fill in services for Prometheus, Loki, Tempo, Grafana Alloy, Alertmanager, and demo microservices
-services: {}
+services:
+  orders:
+    image: observability-services:dev
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    command: ["uvicorn", "orders.main:app", "--host", "0.0.0.0", "--port", "8001", "--no-access-log"]
+    ports:
+      - "${ORDERS_PORT:-8001}:8001"
+    environment:
+      OTEL_SERVICE_NAME: orders
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+
+  gateway:
+    image: observability-services:dev
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    command: ["uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    environment:
+      OTEL_SERVICE_NAME: gateway
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ORDERS_URL: http://orders:8001
+    depends_on:
+      - orders
