@@ -60,11 +60,16 @@ _tracer_provider: TracerProvider | None = None
 _http_clients_instrumented = False
 
 
+def _resolve_service_name(service: str) -> str:
+    """Prefer OTEL_SERVICE_NAME, falling back to the explicit argument."""
+    return os.environ.get("OTEL_SERVICE_NAME") or service
+
+
 def build_resource(service: str) -> Resource:
     """Return the OTel resource shared by metrics and traces."""
     return Resource.create(
         {
-            SERVICE_NAME: service,
+            SERVICE_NAME: _resolve_service_name(service),
             DEPLOYMENT_ENVIRONMENT: os.environ.get("ENVIRONMENT", "development"),
         }
     )
@@ -137,6 +142,7 @@ def _instrument_http_clients() -> None:
 
 def init_observability(app: FastAPI, service: str) -> None:
     """Wire logging, metrics and tracing into a service."""
+    service = _resolve_service_name(service)
     configure_logging(service)
     instruments = get_instruments(service)
     get_tracer_provider(service)

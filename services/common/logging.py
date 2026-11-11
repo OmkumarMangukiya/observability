@@ -1,5 +1,7 @@
 """Structured JSON logging shared by every service (M1.2)."""
 
+import logging
+import os
 from collections.abc import Callable
 from typing import Any
 
@@ -17,6 +19,18 @@ return value -> updated even dict
 Processor = Callable[[Any, str, EventDict], EventDict]
 
 _configured = False
+
+_LOG_LEVELS: dict[str, int] = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+}
+
+
+def log_level() -> int:
+    """Return the level from LOG_LEVEL, falling back to INFO for unknown values."""
+    return _LOG_LEVELS.get(os.environ.get("LOG_LEVEL", "info").strip().lower(), logging.INFO)
 
 
 def _add_service(service: str) -> Processor:
@@ -55,8 +69,9 @@ def configure_logging(service: str) -> None:
             structlog.processors.TimeStamper(fmt="iso", utc=True),
             structlog.processors.JSONRenderer(),
         ],
+        wrapper_class=structlog.make_filtering_bound_logger(log_level()),
         logger_factory=structlog.PrintLoggerFactory(),
-        cache_logger_on_first_use=True,
+        cache_logger_on_first_use=False,
     )
     _configured = True
 

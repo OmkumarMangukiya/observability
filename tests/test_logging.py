@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from datetime import datetime, timedelta
 
 import pytest
+import structlog
 from opentelemetry.sdk.trace import TracerProvider
 
 from common import logging as common_logging
@@ -15,9 +16,11 @@ from common.logging import configure_logging, get_logger
 def reset_logging_config() -> Iterator[None]:
     """Clear the process-wide "configure once" flag so each test sets its own service."""
     # Other test modules import service apps, which configure logging at import time.
+    structlog.reset_defaults()
     common_logging._configured = False
     yield
     common_logging._configured = False
+    structlog.reset_defaults()
 
 
 def _logged_events(captured: str) -> list[dict[str, object]]:
@@ -84,3 +87,29 @@ def test_configure_logging_only_applies_once(capsys) -> None:
     events = _logged_events(captured)
     assert len(events) == 1
     assert events[0]["service"] == "orders"
+
+
+def test_log_level_error_drops_info(monkeypatch, capsys) -> None:
+    """LOG_LEVEL=error silences info but keeps error lines."""
+    monkeypatch.setenv("LOG_LEVEL", "error")
+    configure_logging("orders")
+
+    get_logger().info("dropped")
+    get_logger().error("kept")
+    captured = capsys.readouterr().out
+
+    events = _logged_events(captured)
+    assert [event["event"] for event in events] == ["kept"]
+
+
+def test_unknown_log_level_falls_back_to_info(monkeypatch, capsys) -> None:
+    """A typo'd level behaves like info, not like a mute button."""
+    monkeypatch.setenv("LOG_LEVEL", "shouty")
+    configure_logging("orders")
+
+    get_logger().debug("dropped")
+    get_logger().info("kept")
+    captured = capsys.readouterr().out
+
+    events = _logged_events(captured)
+    assert [event["event"] for event in events] == ["kept"]

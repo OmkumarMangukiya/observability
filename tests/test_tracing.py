@@ -105,3 +105,21 @@ def test_otlp_exporter_is_added_when_endpoint_is_set(monkeypatch) -> None:
     provider.shutdown()
 
     assert created == [{"endpoint": "http://alloy:4318/v1/traces"}]
+
+
+def test_otel_service_name_env_overrides_argument(monkeypatch) -> None:
+    """OTEL_SERVICE_NAME wins over the name passed in code."""
+    monkeypatch.setenv("OTEL_SERVICE_NAME", "orders")
+
+    resource = telemetry.build_resource("gateway")
+
+    assert resource.attributes[telemetry.SERVICE_NAME] == "orders"
+
+
+def test_otel_service_name_defaults_to_argument(monkeypatch) -> None:
+    """With the env var unset, the code argument is the name."""
+    monkeypatch.delenv("OTEL_SERVICE_NAME", raising=False)
+
+    resource = telemetry.build_resource("gateway")
+
+    assert resource.attributes[telemetry.SERVICE_NAME] == "gateway"
