@@ -55,7 +55,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | M1.6 | Gateway service | ✅ |
 | M1.7 | Containerize the two services | ✅ |
 | M1.8 | Prometheus + Grafana datasource | ✅ |
-| M1.9 | Loki + Alloy logs | ⬜ |
+| M1.9 | Loki + Alloy logs | ✅ |
 | M1.10 | Tempo + Alloy traces | ⬜ |
 | M1.11 | Dashboard, docs, acceptance | ⬜ |
 
@@ -99,7 +99,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** `tests/test_infra_configs.py` — YAML/JSON parses; image tags pinned (no `latest`); mounts relative; Prometheus targets match compose service names/ports; referenced datasource UIDs exist.
 - **Done when:** Prometheus targets UP; both metric families present for both services; Grafana Explore plots request rate.
 
-### M1.9 — Loki + Alloy logs ⬜
+### M1.9 — Loki + Alloy logs ✅
 - **Build:** `infra/loki/loki-config.yml` (single binary, schema v13, filesystem storage, `auth_enabled: false`, structured metadata on, analytics off); `infra/alloy/config.alloy` (`discovery.docker` → `discovery.relabel` keeping only `gateway|orders` and setting `service_name` from `com.docker.compose.service` → `loki.source.docker` → `loki.write` to `http://loki:3100/loki/api/v1/push`); compose Loki `3.3.2` + Alloy `v1.5.1` mounting `/var/run/docker.sock:ro` and the config, Loki published on host `3100` for the smoke script; Loki datasource UID `loki`; `scripts/smoke.sh` phase 2.
 - **Tests:** extend `tests/test_infra_configs.py`.
 - **Done when:** Grafana Explore query `{service_name="gateway"}` returns JSON log lines containing `trace_id`; `scripts/smoke.sh` phase 2 passes.
@@ -132,7 +132,8 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - [x] **M1.6 — Gateway service**
 - [x] **M1.7 — Containerize the two services**
 - [x] **M1.8 — Prometheus + Grafana datasource**
-- [ ] **M1.9 — Loki + Alloy logs** (start here)
+- [x] **M1.9 — Loki + Alloy logs**
+- [ ] **M1.10 — Tempo + Alloy traces** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.

@@ -1,4 +1,4 @@
-"""Tests for infra configuration files (M1.8)."""
+"""Tests for infra configuration files (M1.8, M1.9)."""
 
 import json
 from pathlib import Path
@@ -9,6 +9,8 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_PATH = REPO_ROOT / "docker-compose.yml"
 PROMETHEUS_CONFIG_PATH = REPO_ROOT / "infra" / "prometheus" / "prometheus.yml"
+LOKI_CONFIG_PATH = REPO_ROOT / "infra" / "loki" / "loki-config.yml"
+ALLOY_CONFIG_PATH = REPO_ROOT / "infra" / "alloy" / "config.alloy"
 DATASOURCES_PATH = (
     REPO_ROOT / "infra" / "grafana" / "provisioning" / "datasources" / "datasources.yml"
 )
@@ -40,6 +42,14 @@ def _datasources() -> list[dict[str, Any]]:
     return datasources
 
 
+def _alloy_config() -> str:
+    """Return the Alloy config with whitespace collapsed to single spaces."""
+    assert ALLOY_CONFIG_PATH.is_file(), (
+        f"missing config file: {ALLOY_CONFIG_PATH.relative_to(REPO_ROOT)}"
+    )
+    return " ".join(ALLOY_CONFIG_PATH.read_text(encoding="utf-8").split())
+
+
 def _container_ports(service: dict[str, Any]) -> set[str]:
     """Container-side ports from "host:container" publish entries."""
     ports: set[str] = set()
@@ -67,7 +77,12 @@ def _dashboard_datasource_uids(node: Any) -> set[str]:
 
 def test_infra_yaml_files_parse() -> None:
     """Each config file exists and parses as YAML."""
-    for path in (COMPOSE_PATH, PROMETHEUS_CONFIG_PATH, DATASOURCES_PATH):
+    for path in (
+        COMPOSE_PATH,
+        PROMETHEUS_CONFIG_PATH,
+        LOKI_CONFIG_PATH,
+        DATASOURCES_PATH,
+    ):
         assert _load_yaml(path)
 
 
@@ -130,6 +145,63 @@ def test_prometheus_targets_match_compose_services() -> None:
         )
 
 
+def test_loki_config_uses_single_binary_filesystem_storage() -> None:
+    """Loki runs single-binary: no auth, schema v13, filesystem storage."""
+    config = _load_yaml(LOKI_CONFIG_PATH)
+    assert config["auth_enabled"] is False
+
+    schema = config["schema_config"]["configs"][0]
+    assert schema["schema"] == "v13"
+    assert schema["store"] == "tsdb"
+    assert schema["object_store"] == "filesystem"
+
+    storage = config["common"]["storage"]["filesystem"]
+    assert storage["chunks_directory"] == "/loki/chunks"
+    assert storage["rules_directory"] == "/loki/rules"
+
+    assert config["limits_config"]["allow_structured_metadata"] is True
+    assert config["analytics"]["reporting_enabled"] is False
+
+
+def test_loki_is_published_for_the_smoke_script() -> None:
+    """Loki's port 3100 is published so smoke.sh can query it from the host."""
+    loki = _load_compose()["services"]["loki"]
+    assert "3100" in _container_ports(loki)
+
+
+def test_alloy_ships_app_container_logs_to_loki() -> None:
+    """Alloy reads Docker logs, keeps gateway/orders, and pushes to Loki."""
+    config = _alloy_config()
+    assert 'discovery.docker "containers"' in config
+    assert 'discovery.relabel "services"' in config
+    assert "targets = discovery.docker.containers.targets" in config
+
+    assert 'loki.source.docker "app_logs"' in config
+    assert "targets = discovery.relabel.services.output" in config
+
+    assert "__meta_docker_container_label_com_docker_compose_service" in config
+    assert 'regex = "gateway|orders"' in config
+    assert 'target_label = "service_name"' in config
+
+    assert 'loki.write "local"' in config
+    assert 'url = "http://loki:3100/loki/api/v1/push"' in config
+    assert "forward_to = [loki.write.local.receiver]" in config
+
+
+def test_alloy_and_loki_mount_their_configs() -> None:
+    """Loki and Alloy mount their configs; Alloy also gets the Docker socket."""
+    services = _load_compose()["services"]
+    loki_volumes = [str(volume) for volume in services["loki"]["volumes"]]
+    alloy_volumes = [str(volume) for volume in services["alloy"]["volumes"]]
+
+    assert "./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro" in loki_volumes
+    assert "./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro" in alloy_volumes
+    assert "/var/run/docker.sock:/var/run/docker.sock:ro" in alloy_volumes
+
+    assert LOKI_CONFIG_PATH.is_file()
+    assert ALLOY_CONFIG_PATH.is_file()
+
+
 def test_grafana_prometheus_datasource_is_provisioned() -> None:
     """Prometheus is provisioned with the fixed UID, proxied, and default."""
     by_uid = {datasource.get("uid"): datasource for datasource in _datasources()}
@@ -139,6 +211,16 @@ def test_grafana_prometheus_datasource_is_provisioned() -> None:
     assert datasource["url"] == "http://prometheus:9090"
     assert datasource.get("access") == "proxy"
     assert datasource.get("isDefault") is True
+
+
+def test_grafana_loki_datasource_is_provisioned() -> None:
+    """Loki is provisioned with UID 'loki', proxied to the Loki container."""
+    by_uid = {datasource.get("uid"): datasource for datasource in _datasources()}
+    assert "loki" in by_uid, "datasource UID 'loki' is missing"
+    datasource = by_uid["loki"]
+    assert datasource["type"] == "loki"
+    assert datasource["url"] == "http://loki:3100"
+    assert datasource.get("access") == "proxy"
 
 
 def test_dashboards_reference_defined_datasource_uids() -> None:

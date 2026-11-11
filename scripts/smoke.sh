@@ -44,3 +44,38 @@ missing=()
   || fail "phase 1: trace ${trace_id} missing from logs of: ${missing[*]}"
 
 printf 'smoke: PASS — phase 1 (trace %s in gateway and orders logs)\n' "${trace_id}"
+
+# --- Phase 2 (M1.9): the same trace must reach Loki for both services. ---
+loki_url="${LOKI_URL:-http://localhost:3100}"
+loki_timeout=30
+logql="{service_name=~\"gateway|orders\"} |= \"${trace_id}\""
+
+loki_gateway=false
+loki_orders=false
+loki_deadline=$((SECONDS + loki_timeout))
+while (( SECONDS < loki_deadline )); do
+  response="$(curl -sS -G \
+    --data-urlencode "query=${logql}" \
+    --data-urlencode "limit=100" \
+    "${loki_url}/loki/api/v1/query_range" 2>/dev/null || true)"
+  compact="$(printf '%s' "${response}" | tr -d ' \t\n')"
+
+  if [[ "${compact}" == *'"service_name":"gateway"'* ]]; then
+    loki_gateway=true
+  fi
+  if [[ "${compact}" == *'"service_name":"orders"'* ]]; then
+    loki_orders=true
+  fi
+  if [[ "${loki_gateway}" == true && "${loki_orders}" == true ]]; then
+    break
+  fi
+  sleep 1
+done
+
+loki_missing=()
+[[ "${loki_gateway}" == true ]] || loki_missing+=("gateway")
+[[ "${loki_orders}" == true ]] || loki_missing+=("orders")
+(( ${#loki_missing[@]} == 0 )) \
+  || fail "phase 2: trace ${trace_id} missing from Loki for: ${loki_missing[*]}"
+
+printf 'smoke: PASS — phase 2 (trace %s in Loki for gateway and orders)\n' "${trace_id}"
