@@ -54,7 +54,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | M1.5 | Orders service | ✅ |
 | M1.6 | Gateway service | ✅ |
 | M1.7 | Containerize the two services | ✅ |
-| M1.8 | Prometheus + Grafana datasource | ⬜ |
+| M1.8 | Prometheus + Grafana datasource | ✅ |
 | M1.9 | Loki + Alloy logs | ⬜ |
 | M1.10 | Tempo + Alloy traces | ⬜ |
 | M1.11 | Dashboard, docs, acceptance | ⬜ |
@@ -94,7 +94,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Verify:** `docker compose up -d --build`; `curl -s localhost:8000/orders` → 200; `curl -s localhost:8000/orders/999` → 404; `scripts/smoke.sh` phase 1.
 - **Done when:** `scripts/smoke.sh` phase 1 passes — the synthesised trace ID appears in both services' logs. First Docker-dependent step.
 
-### M1.8 — Prometheus + Grafana datasource ⬜
+### M1.8 — Prometheus + Grafana datasource ✅
 - **Build:** `infra/prometheus/prometheus.yml` (5s scrape of `gateway:8000` and `orders:8001`); compose Prometheus `v3.0.1` and Grafana `11.4.0` with named volumes; Grafana provisioning `infra/grafana/provisioning/datasources/datasources.yml` (Prometheus, UID `prometheus`, default); `GF_ADMIN_PASSWORD` from env.
 - **Tests:** `tests/test_infra_configs.py` — YAML/JSON parses; image tags pinned (no `latest`); mounts relative; Prometheus targets match compose service names/ports; referenced datasource UIDs exist.
 - **Done when:** Prometheus targets UP; both metric families present for both services; Grafana Explore plots request rate.
@@ -131,7 +131,8 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - [x] **M1.5 — Orders service**
 - [x] **M1.6 — Gateway service**
 - [x] **M1.7 — Containerize the two services**
-- [ ] **M1.8 — Prometheus + Grafana datasource** (start here)
+- [x] **M1.8 — Prometheus + Grafana datasource**
+- [ ] **M1.9 — Loki + Alloy logs** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.
