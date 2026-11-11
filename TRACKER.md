@@ -56,7 +56,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | M1.7 | Containerize the two services | ✅ |
 | M1.8 | Prometheus + Grafana datasource | ✅ |
 | M1.9 | Loki + Alloy logs | ✅ |
-| M1.10 | Tempo + Alloy traces | ⬜ |
+| M1.10 | Tempo + Alloy traces | ✅ |
 | M1.11 | Dashboard, docs, acceptance | ⬜ |
 
 ### M1.1 — Scaffolding & test harness ✅
@@ -104,7 +104,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** extend `tests/test_infra_configs.py`.
 - **Done when:** Grafana Explore query `{service_name="gateway"}` returns JSON log lines containing `trace_id`; `scripts/smoke.sh` phase 2 passes.
 
-### M1.10 — Tempo + Alloy traces ⬜
+### M1.10 — Tempo + Alloy traces ✅
 - **Build:** `infra/tempo/tempo.yml` (single binary, local backend `/var/tempo`, OTLP receivers 4317/4318); Alloy `otelcol.receiver.otlp` → `otelcol.processor.batch` → `otelcol.exporter.otlp` to `tempo:4317` (insecure), run Alloy with `--stability.level=experimental`; compose Tempo `2.6.1`, Tempo published on host `3200` for the smoke script; services get `OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318` and `OTEL_RESOURCE_ATTRIBUTES=deployment.environment=development`; Tempo datasource UID `tempo`; Loki derived field `trace_id` → Tempo internal link; Tempo `tracesToLogsV2` (filter by trace ID).
 - **Tests:** extend `tests/test_infra_configs.py`.
 - **Done when:** one trace in Tempo shows gateway and orders spans; clicking a Loki log line opens that trace; "Logs for this span" opens Loki filtered by trace ID; `scripts/smoke.sh` phase 3 passes.
@@ -133,7 +133,8 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - [x] **M1.7 — Containerize the two services**
 - [x] **M1.8 — Prometheus + Grafana datasource**
 - [x] **M1.9 — Loki + Alloy logs**
-- [ ] **M1.10 — Tempo + Alloy traces** (start here)
+- [x] **M1.10 — Tempo + Alloy traces**
+- [ ] **M1.11 — Dashboard, docs, acceptance** (start here)
 
 ## Open questions / blockers
 - None blocking the plan itself.

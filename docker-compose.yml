@@ -9,6 +9,8 @@ services:
       - "${ORDERS_PORT:-8001}:8001"
     environment:
       OTEL_SERVICE_NAME: orders
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENVIRONMENT: ${ENVIRONMENT:-development}
 
@@ -22,6 +24,8 @@ services:
       - "${GATEWAY_PORT:-8000}:8000"
     environment:
       OTEL_SERVICE_NAME: gateway
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       ORDERS_URL: http://orders:8001
@@ -51,13 +55,28 @@ services:
       - ./infra/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki-data:/loki
 
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - ./infra/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+
   alloy:
     image: grafana/alloy:v1.5.1
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --stability.level=experimental
     volumes:
       - ./infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - loki
+      - tempo
 
   grafana:
     image: grafana/grafana:11.4.0
@@ -71,8 +90,10 @@ services:
     depends_on:
       - prometheus
       - loki
+      - tempo
 
 volumes:
   prometheus-data:
   grafana-data:
   loki-data:
+  tempo-data:

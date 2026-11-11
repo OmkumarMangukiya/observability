@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# End-to-end pipeline check. Phase 1 (M1.7): one request reaches both services' logs.
+# End-to-end pipeline check: one request's trace reaches both services' logs
+# (phase 1), Loki (phase 2), and Tempo (phase 3).
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -79,3 +80,34 @@ loki_missing=()
   || fail "phase 2: trace ${trace_id} missing from Loki for: ${loki_missing[*]}"
 
 printf 'smoke: PASS — phase 2 (trace %s in Loki for gateway and orders)\n' "${trace_id}"
+
+# --- Phase 3 (M1.10): the same trace must reach Tempo with spans from both services. ---
+tempo_url="${TEMPO_URL:-http://localhost:3200}"
+tempo_timeout=30
+
+tempo_gateway=false
+tempo_orders=false
+tempo_deadline=$((SECONDS + tempo_timeout))
+while (( SECONDS < tempo_deadline )); do
+  trace_json="$(curl -sS "${tempo_url}/api/traces/${trace_id}" 2>/dev/null || true)"
+  compact="$(printf '%s' "${trace_json}" | tr -d ' \t\n')"
+
+  if [[ "${compact}" == *'"stringValue":"gateway"'* ]]; then
+    tempo_gateway=true
+  fi
+  if [[ "${compact}" == *'"stringValue":"orders"'* ]]; then
+    tempo_orders=true
+  fi
+  if [[ "${tempo_gateway}" == true && "${tempo_orders}" == true ]]; then
+    break
+  fi
+  sleep 1
+done
+
+tempo_missing=()
+[[ "${tempo_gateway}" == true ]] || tempo_missing+=("gateway")
+[[ "${tempo_orders}" == true ]] || tempo_missing+=("orders")
+(( ${#tempo_missing[@]} == 0 )) \
+  || fail "phase 3: trace ${trace_id} missing from Tempo for: ${tempo_missing[*]}"
+
+printf 'smoke: PASS — phase 3 (trace %s in Tempo for gateway and orders)\n' "${trace_id}"

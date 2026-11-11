@@ -1,4 +1,4 @@
-"""Tests for infra configuration files (M1.8, M1.9)."""
+"""Tests for infra configuration files (M1.8, M1.9, M1.10)."""
 
 import json
 from pathlib import Path
@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_PATH = REPO_ROOT / "docker-compose.yml"
 PROMETHEUS_CONFIG_PATH = REPO_ROOT / "infra" / "prometheus" / "prometheus.yml"
 LOKI_CONFIG_PATH = REPO_ROOT / "infra" / "loki" / "loki-config.yml"
+TEMPO_CONFIG_PATH = REPO_ROOT / "infra" / "tempo" / "tempo.yml"
 ALLOY_CONFIG_PATH = REPO_ROOT / "infra" / "alloy" / "config.alloy"
 DATASOURCES_PATH = (
     REPO_ROOT / "infra" / "grafana" / "provisioning" / "datasources" / "datasources.yml"
@@ -81,6 +82,7 @@ def test_infra_yaml_files_parse() -> None:
         COMPOSE_PATH,
         PROMETHEUS_CONFIG_PATH,
         LOKI_CONFIG_PATH,
+        TEMPO_CONFIG_PATH,
         DATASOURCES_PATH,
     ):
         assert _load_yaml(path)
@@ -202,6 +204,66 @@ def test_alloy_and_loki_mount_their_configs() -> None:
     assert ALLOY_CONFIG_PATH.is_file()
 
 
+def test_tempo_config_uses_single_binary_local_storage() -> None:
+    """Tempo stores traces on local disk and accepts OTLP on 4317/4318."""
+    config = _load_yaml(TEMPO_CONFIG_PATH)
+    assert config["server"]["http_listen_port"] == 3200
+
+    protocols = config["distributor"]["receivers"]["otlp"]["protocols"]
+    assert protocols["grpc"]["endpoint"] == "0.0.0.0:4317"
+    assert protocols["http"]["endpoint"] == "0.0.0.0:4318"
+
+    trace_storage = config["storage"]["trace"]
+    assert trace_storage["backend"] == "local"
+    assert trace_storage["wal"]["path"].startswith("/var/tempo/")
+    assert trace_storage["local"]["path"].startswith("/var/tempo/")
+
+
+def test_tempo_is_published_for_the_smoke_script() -> None:
+    """Tempo's port 3200 is published so smoke.sh can query it from the host."""
+    tempo = _load_compose()["services"]["tempo"]
+    assert "3200" in _container_ports(tempo)
+
+
+def test_tempo_mounts_config_and_data_volume() -> None:
+    """Tempo mounts its config read-only and keeps data in a named volume."""
+    services = _load_compose()["services"]
+    volumes = [str(volume) for volume in services["tempo"]["volumes"]]
+    assert "./infra/tempo/tempo.yml:/etc/tempo/tempo.yml:ro" in volumes
+    assert "tempo-data:/var/tempo" in volumes
+    assert TEMPO_CONFIG_PATH.is_file()
+
+
+def test_alloy_receives_otlp_and_exports_to_tempo() -> None:
+    """Alloy accepts spans over OTLP and batches them to Tempo."""
+    config = _alloy_config()
+    assert 'otelcol.receiver.otlp "traces"' in config
+    assert 'endpoint = "0.0.0.0:4317"' in config
+    assert 'endpoint = "0.0.0.0:4318"' in config
+    assert 'otelcol.processor.batch "default"' in config
+    assert 'otelcol.exporter.otlp "tempo"' in config
+    assert 'endpoint = "tempo:4317"' in config
+    assert "insecure = true" in config
+
+    assert "traces = [otelcol.processor.batch.default.input]" in config
+    assert "traces = [otelcol.exporter.otlp.tempo.input]" in config
+
+
+def test_alloy_runs_at_experimental_stability() -> None:
+    """The otelcol.* components need Alloy's experimental stability level."""
+    command = [str(part) for part in _load_compose()["services"]["alloy"]["command"]]
+    assert "--stability.level=experimental" in command
+
+
+def test_services_export_traces_to_alloy() -> None:
+    """Both services send OTLP/HTTP spans to Alloy and tag the environment."""
+    services = _load_compose()["services"]
+    for name in ("gateway", "orders"):
+        environment = services[name]["environment"]
+        assert environment["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://alloy:4318"
+        assert "deployment.environment=" in environment["OTEL_RESOURCE_ATTRIBUTES"]
+
+
 def test_grafana_prometheus_datasource_is_provisioned() -> None:
     """Prometheus is provisioned with the fixed UID, proxied, and default."""
     by_uid = {datasource.get("uid"): datasource for datasource in _datasources()}
@@ -221,6 +283,35 @@ def test_grafana_loki_datasource_is_provisioned() -> None:
     assert datasource["type"] == "loki"
     assert datasource["url"] == "http://loki:3100"
     assert datasource.get("access") == "proxy"
+
+
+def test_grafana_tempo_datasource_is_provisioned() -> None:
+    """Tempo is provisioned with UID 'tempo', proxied to the Tempo container."""
+    by_uid = {datasource.get("uid"): datasource for datasource in _datasources()}
+    assert "tempo" in by_uid, "datasource UID 'tempo' is missing"
+    datasource = by_uid["tempo"]
+    assert datasource["type"] == "tempo"
+    assert datasource["url"] == "http://tempo:3200"
+    assert datasource.get("access") == "proxy"
+
+
+def test_loki_logs_link_to_tempo_traces() -> None:
+    """A log line's trace_id links to the same trace in Tempo."""
+    by_uid = {datasource.get("uid"): datasource for datasource in _datasources()}
+    derived = by_uid["loki"]["jsonData"]["derivedFields"]
+    to_tempo = [field for field in derived if field.get("datasourceUid") == "tempo"]
+    assert to_tempo, "Loki has no derived field pointing at Tempo"
+    field = to_tempo[0]
+    assert "trace_id" in field["matcherRegex"]
+    assert field["url"] == "$${__value.raw}"
+
+
+def test_tempo_traces_link_to_loki_logs() -> None:
+    """Tempo's 'Logs for this span' filters Loki by trace ID."""
+    by_uid = {datasource.get("uid"): datasource for datasource in _datasources()}
+    traces_to_logs = by_uid["tempo"]["jsonData"]["tracesToLogsV2"]
+    assert traces_to_logs["datasourceUid"] == "loki"
+    assert traces_to_logs["filterByTraceID"] is True
 
 
 def test_dashboards_reference_defined_datasource_uids() -> None:
