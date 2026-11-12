@@ -35,12 +35,14 @@ def orders_action(handler: Handler) -> Iterator[list[httpx.Request]]:
 
 
 def test_list_orders_proxies_orders_response() -> None:
-    """GET /orders returns the orders service's own body and status."""
-    with orders_action(lambda request: httpx.Response(200, json=[{"id": "order-1"}])) as sent:
+    """GET /orders passes the three-service body and status through untouched."""
+    body = [{"id": "order-1", "payment": {"id": "payment-1", "status": "confirmed"}}]
+
+    with orders_action(lambda request: httpx.Response(200, json=body)) as sent:
         response = client.get("/orders")
 
     assert response.status_code == 200
-    assert response.json() == [{"id": "order-1"}]
+    assert response.json() == body
     assert str(sent[0].url) == "http://orders:8001/orders"
 
 

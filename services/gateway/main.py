@@ -1,7 +1,7 @@
 """Gateway service (M1.6)."""
 
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Keep one HTTP client for the whole process."""
     with httpx.Client(base_url=ORDERS_URL) as client:
         app.state.orders_client = client

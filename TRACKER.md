@@ -34,7 +34,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 | Step | Scope | Status |
 |---|---|---|
 | M3.1 | Payments service | ✅ |
-| M3.2 | Wire payments into gateway + compose | ⬜ |
+| M3.2 | Wire payments into gateway + compose | ✅ |
 | M3.3 | Fault-injection framework | ⬜ |
 | M3.4 | Fault: slow endpoint | ⬜ |
 | M3.5 | Fault: random 500s | ⬜ |
@@ -48,7 +48,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** `tests/test_payments.py` — process 200, unknown id 404, healthz 200, metrics carry `service_name="payments"`.
 - **Done when:** tests pass; `ruff check` clean.
 
-### M3.2 — Wire payments into gateway + compose ⬜
+### M3.2 — Wire payments into gateway + compose ✅
 - **Build:** Orders service calls payments when creating/listing orders (e.g., each order triggers a payment processing call); gateway routes propagate trace context through the full chain. Compose entry for payments (shared build, port 8002, `OTEL_SERVICE_NAME=payments`). Update `scripts/smoke.sh` to verify the three-service trace.
 - **Tests:** `tests/test_gateway.py` updated for the three-service flow; `tests/test_orders.py` updated for the payments dependency.
 - **Done when:** `curl localhost:8000/orders` produces a trace with gateway → orders → payments spans; `scripts/smoke.sh` passes; Grafana dashboard shows payments in the `$service` variable.
@@ -69,7 +69,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Done when:** tests pass; the 5xx error rate panel in Grafana visibly increases when the fault is on.
 
 ### M3.6 — Fault: dependency timeout ⬜
-- **Build:** When `FAULT_DEPENDENCY_TIMEOUT=true`, orders' call to payments hangs (payments delays indefinitely or past orders' client timeout). Orders should log `orders_call_failed` (similar to gateway's pattern) and return 504 or 502. The trace should show the orders span waiting and eventually timing out.
+- **Build:** When `FAULT_DEPENDENCY_TIMEOUT=true`, orders' call to payments hangs (payments delays indefinitely or past orders' client timeout). Orders should log `payments_call_failed` (same `{dependency}_call_failed` convention as gateway's `orders_call_failed`) and return 504 or 502. The trace should show the orders span waiting and eventually timing out.
 - **Tests:** `tests/test_fault_timeout.py` — with fault active, orders returns 502/504 within a reasonable client timeout; the error is logged with structured fields; the trace shows the timeout span.
 - **Done when:** tests pass; the trace in Tempo shows the timeout behavior.
 
@@ -117,7 +117,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 
 ## In flight / Next
 - [x] **M3.1 — Payments service**
-- [ ] **M3.2 — Wire payments into gateway + compose**
+- [x] **M3.2 — Wire payments into gateway + compose**
 - [ ] **M3.3 — Fault-injection framework**
 - [ ] **M3.4 — Fault: slow endpoint**
 - [ ] **M3.5 — Fault: random 500s**

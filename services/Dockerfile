@@ -12,7 +12,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY common/ ./common/
 COPY gateway/ ./gateway/
 COPY orders/ ./orders/
+COPY payments/ ./payments/
 
-EXPOSE 8000 8001
+EXPOSE 8000 8001 8002
 
 CMD ["uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

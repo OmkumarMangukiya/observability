@@ -176,7 +176,7 @@ def test_loki_is_published_for_the_smoke_script() -> None:
 
 
 def test_alloy_ships_app_container_logs_to_loki() -> None:
-    """Alloy reads Docker logs, keeps gateway/orders, and pushes to Loki."""
+    """Alloy reads Docker logs, keeps gateway/orders/payments, and pushes to Loki."""
     config = _alloy_config()
     assert 'discovery.docker "containers"' in config
     assert 'discovery.relabel "services"' in config
@@ -186,7 +186,7 @@ def test_alloy_ships_app_container_logs_to_loki() -> None:
     assert "targets = discovery.relabel.services.output" in config
 
     assert "__meta_docker_container_label_com_docker_compose_service" in config
-    assert 'regex = "gateway|orders"' in config
+    assert 'regex = "gateway|orders|payments"' in config
     assert 'target_label = "service_name"' in config
 
     assert 'loki.write "local"' in config
@@ -260,9 +260,9 @@ def test_alloy_runs_at_experimental_stability() -> None:
 
 
 def test_services_export_traces_to_alloy() -> None:
-    """Both services send OTLP/HTTP spans to Alloy and tag the environment."""
+    """All services send OTLP/HTTP spans to Alloy and tag the environment."""
     services = _load_compose()["services"]
-    for name in ("gateway", "orders"):
+    for name in ("gateway", "orders", "payments"):
         environment = services[name]["environment"]
         assert environment["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://alloy:4318"
         assert "deployment.environment=" in environment["OTEL_RESOURCE_ATTRIBUTES"]

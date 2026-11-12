@@ -13,6 +13,24 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENVIRONMENT: ${ENVIRONMENT:-development}
+      PAYMENTS_URL: http://payments:8002
+    depends_on:
+      - payments
+
+  payments:
+    image: observability-services:dev
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    command: ["uvicorn", "payments.main:app", "--host", "0.0.0.0", "--port", "8002", "--no-access-log"]
+    ports:
+      - "${PAYMENTS_PORT:-8002}:8002"
+    environment:
+      OTEL_SERVICE_NAME: payments
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment=${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
 
   gateway:
     image: observability-services:dev
@@ -45,6 +63,7 @@ services:
     depends_on:
       - gateway
       - orders
+      - payments
 
   loki:
     image: grafana/loki:3.3.2

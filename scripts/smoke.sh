@@ -24,6 +24,7 @@ status="$(curl -sS -o /dev/null -w '%{http_code}' \
 
 gateway_seen=false
 orders_seen=false
+payments_seen=false
 deadline=$((SECONDS + wait_seconds))
 while (( SECONDS < deadline )); do
   if [[ "${gateway_seen}" != true ]] \
@@ -34,25 +35,32 @@ while (( SECONDS < deadline )); do
     && docker compose logs orders 2>/dev/null | grep -q -- "${trace_id}"; then
     orders_seen=true
   fi
-  [[ "${gateway_seen}" == true && "${orders_seen}" == true ]] && break
+  if [[ "${payments_seen}" != true ]] \
+    && docker compose logs payments 2>/dev/null | grep -q -- "${trace_id}"; then
+    payments_seen=true
+  fi
+  [[ "${gateway_seen}" == true && "${orders_seen}" == true && "${payments_seen}" == true ]] \
+    && break
   sleep 1
 done
 
 missing=()
 [[ "${gateway_seen}" == true ]] || missing+=("gateway")
 [[ "${orders_seen}" == true ]] || missing+=("orders")
+[[ "${payments_seen}" == true ]] || missing+=("payments")
 (( ${#missing[@]} == 0 )) \
   || fail "phase 1: trace ${trace_id} missing from logs of: ${missing[*]}"
 
-printf 'smoke: PASS — phase 1 (trace %s in gateway and orders logs)\n' "${trace_id}"
+printf 'smoke: PASS — phase 1 (trace %s in gateway, orders and payments logs)\n' "${trace_id}"
 
-# --- Phase 2 (M1.9): the same trace must reach Loki for both services. ---
+# --- Phase 2 (M1.9): the same trace must reach Loki for all three services. ---
 loki_url="${LOKI_URL:-http://localhost:3100}"
 loki_timeout=30
-logql="{service_name=~\"gateway|orders\"} |= \"${trace_id}\""
+logql="{service_name=~\"gateway|orders|payments\"} |= \"${trace_id}\""
 
 loki_gateway=false
 loki_orders=false
+loki_payments=false
 loki_deadline=$((SECONDS + loki_timeout))
 while (( SECONDS < loki_deadline )); do
   response="$(curl -sS -G \
@@ -67,7 +75,10 @@ while (( SECONDS < loki_deadline )); do
   if [[ "${compact}" == *'"service_name":"orders"'* ]]; then
     loki_orders=true
   fi
-  if [[ "${loki_gateway}" == true && "${loki_orders}" == true ]]; then
+  if [[ "${compact}" == *'"service_name":"payments"'* ]]; then
+    loki_payments=true
+  fi
+  if [[ "${loki_gateway}" == true && "${loki_orders}" == true && "${loki_payments}" == true ]]; then
     break
   fi
   sleep 1
@@ -76,17 +87,19 @@ done
 loki_missing=()
 [[ "${loki_gateway}" == true ]] || loki_missing+=("gateway")
 [[ "${loki_orders}" == true ]] || loki_missing+=("orders")
+[[ "${loki_payments}" == true ]] || loki_missing+=("payments")
 (( ${#loki_missing[@]} == 0 )) \
   || fail "phase 2: trace ${trace_id} missing from Loki for: ${loki_missing[*]}"
 
-printf 'smoke: PASS — phase 2 (trace %s in Loki for gateway and orders)\n' "${trace_id}"
+printf 'smoke: PASS — phase 2 (trace %s in Loki for gateway, orders and payments)\n' "${trace_id}"
 
-# --- Phase 3 (M1.10): the same trace must reach Tempo with spans from both services. ---
+# --- Phase 3 (M1.10): the same trace must reach Tempo with spans from all three services. ---
 tempo_url="${TEMPO_URL:-http://localhost:3200}"
 tempo_timeout=30
 
 tempo_gateway=false
 tempo_orders=false
+tempo_payments=false
 tempo_deadline=$((SECONDS + tempo_timeout))
 while (( SECONDS < tempo_deadline )); do
   trace_json="$(curl -sS "${tempo_url}/api/traces/${trace_id}" 2>/dev/null || true)"
@@ -98,7 +111,10 @@ while (( SECONDS < tempo_deadline )); do
   if [[ "${compact}" == *'"stringValue":"orders"'* ]]; then
     tempo_orders=true
   fi
-  if [[ "${tempo_gateway}" == true && "${tempo_orders}" == true ]]; then
+  if [[ "${compact}" == *'"stringValue":"payments"'* ]]; then
+    tempo_payments=true
+  fi
+  if [[ "${tempo_gateway}" == true && "${tempo_orders}" == true && "${tempo_payments}" == true ]]; then
     break
   fi
   sleep 1
@@ -107,7 +123,8 @@ done
 tempo_missing=()
 [[ "${tempo_gateway}" == true ]] || tempo_missing+=("gateway")
 [[ "${tempo_orders}" == true ]] || tempo_missing+=("orders")
+[[ "${tempo_payments}" == true ]] || tempo_missing+=("payments")
 (( ${#tempo_missing[@]} == 0 )) \
   || fail "phase 3: trace ${trace_id} missing from Tempo for: ${tempo_missing[*]}"
 
-printf 'smoke: PASS — phase 3 (trace %s in Tempo for gateway and orders)\n' "${trace_id}"
+printf 'smoke: PASS — phase 3 (trace %s in Tempo for gateway, orders and payments)\n' "${trace_id}"

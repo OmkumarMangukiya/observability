@@ -7,7 +7,7 @@ discovery.relabel "services" {
 
   rule {
     source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
-    regex         = "gateway|orders"
+    regex         = "gateway|orders|payments"
     action        = "keep"
   }
 
