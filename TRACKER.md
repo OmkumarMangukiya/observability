@@ -33,7 +33,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 **Step index:**
 | Step | Scope | Status |
 |---|---|---|
-| M3.1 | Payments service | ⬜ |
+| M3.1 | Payments service | ✅ |
 | M3.2 | Wire payments into gateway + compose | ⬜ |
 | M3.3 | Fault-injection framework | ⬜ |
 | M3.4 | Fault: slow endpoint | ⬜ |
@@ -43,7 +43,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 | M3.8 | Alert rules + Alertmanager | ⬜ |
 | M3.9 | Smoke, docs, acceptance | ⬜ |
 
-### M3.1 — Payments service ⬜
+### M3.1 — Payments service ✅
 - **Build:** `services/payments/main.py` — in-memory payment records; `POST /payments/process` (accepts `order_id`, `amount`; returns payment confirmation with random processing time 50–200 ms), `GET /payments/{id}` (404 for unknown), `GET /healthz`; `init_observability(app, "payments")`. Reuses `services/common/` telemetry, logging, middleware.
 - **Tests:** `tests/test_payments.py` — process 200, unknown id 404, healthz 200, metrics carry `service_name="payments"`.
 - **Done when:** tests pass; `ruff check` clean.
@@ -116,7 +116,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - [x] Phase 2: Milestone 1 — one request fully visible (M1.1–M1.11)
 
 ## In flight / Next
-- [ ] **M3.1 — Payments service**
+- [x] **M3.1 — Payments service**
 - [ ] **M3.2 — Wire payments into gateway + compose**
 - [ ] **M3.3 — Fault-injection framework**
 - [ ] **M3.4 — Fault: slow endpoint**
