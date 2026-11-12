@@ -402,7 +402,7 @@
         }
       ],
       "title": "Traces",
-      "type": "traces"
+      "type": "table"
     }
   ],
   "refresh": "5s",
@@ -413,7 +413,7 @@
   "templating": {
     "list": [
       {
-        "allValue": ".*",
+        "allValue": ".+",
         "current": {
           "selected": true,
           "text": [
