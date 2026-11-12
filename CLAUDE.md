@@ -36,6 +36,7 @@ agent/prompts/            # prompt templates
 infra/{prometheus,loki,tempo,grafana,alertmanager}/
 faults/                   # fault-injection scenarios
 evals/                    # agent evaluation harness
+scripts/                  # smoke.sh end-to-end pipeline check
 docs/                     # plans, decisions, notes
 ```
 

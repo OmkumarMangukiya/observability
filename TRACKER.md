@@ -5,7 +5,7 @@
 |---|---|---|
 | 0 | Concepts | ✅ Done |
 | 1 | Repo skeleton + CLAUDE.md | ✅ Done |
-| 2 | Milestone 1 — one request fully visible | 🔄 In progress — split into M1.1–M1.11 |
+| 2 | Milestone 1 — one request fully visible | ✅ Done (M1.1–M1.11) |
 | 3 | Expand and break things | ⬜ |
 | 4 | Detection and localization by hand | ⬜ |
 | 5 | Agent tools | ⬜ |
@@ -18,13 +18,13 @@
 Milestone 1 was too large to track as one item, so it is broken into eleven steps. Each step is independently verifiable and should land as one reviewable change set.
 
 **Definition of done (whole milestone):**
-- [ ] `docker compose up -d --build` brings up gateway, orders, Prometheus, Loki, Tempo, Alloy, Grafana
-- [ ] `curl localhost:8000/orders` succeeds; the same `trace_id` appears in both services' JSON logs
-- [ ] Prometheus has `http_server_requests_total` and `http_server_request_duration_seconds_bucket` for both services
-- [ ] Tempo shows one trace with gateway → orders spans
-- [ ] Grafana dashboard shows request rate, 5xx error rate, p95, p99, a logs panel, and trace→logs click-through works
-- [ ] `scripts/smoke.sh` passes all three phases (request → Loki → Tempo)
-- [ ] `pytest` and `ruff check` pass
+- [x] `docker compose up -d --build` brings up gateway, orders, Prometheus, Loki, Tempo, Alloy, Grafana
+- [x] `curl localhost:8000/orders` succeeds; the same `trace_id` appears in both services' JSON logs
+- [x] Prometheus has `http_server_requests_total` and `http_server_request_duration_seconds_bucket` for both services
+- [x] Tempo shows one trace with gateway → orders spans
+- [x] Grafana dashboard shows request rate, 5xx error rate, p95, p99, a logs panel, and trace→logs click-through works
+- [x] `scripts/smoke.sh` passes all three phases (request → Loki → Tempo)
+- [x] `pytest` and `ruff check` pass
 
 **Out of scope (do not build in Phase 2):** payments, fault injection, Prometheus alert rules, Alertmanager, agent tools, the raw agent loop, evals, Kubernetes. `infra/alertmanager/` stays empty; alerting is Phase 3.
 
@@ -57,7 +57,7 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 | M1.8 | Prometheus + Grafana datasource | ✅ |
 | M1.9 | Loki + Alloy logs | ✅ |
 | M1.10 | Tempo + Alloy traces | ✅ |
-| M1.11 | Dashboard, docs, acceptance | ⬜ |
+| M1.11 | Dashboard, docs, acceptance | ✅ |
 
 ### M1.1 — Scaffolding & test harness ✅
 - **Build:** `pyproject.toml` (`[tool.pytest.ini_options]` `pythonpath = ["services"]`, `testpaths = ["tests"]`; `[tool.ruff]` `target-version = "py311"`), pinned `services/requirements.txt` and `requirements-dev.txt`, `.env.example` with `GF_ADMIN_PASSWORD=admin`, `tests/conftest.py` setting `OTEL_EXPORTER_OTLP_ENDPOINT=""`, `ENVIRONMENT=test`, `LOG_LEVEL=debug` before app imports, package `__init__.py` files.
@@ -109,10 +109,11 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - **Tests:** extend `tests/test_infra_configs.py`.
 - **Done when:** one trace in Tempo shows gateway and orders spans; clicking a Loki log line opens that trace; "Logs for this span" opens Loki filtered by trace ID; `scripts/smoke.sh` phase 3 passes.
 
-### M1.11 — Dashboard, docs, acceptance ⬜
-- **Build:** `infra/grafana/dashboards/milestone-1.json` (15m range, 5s refresh, `$service` variable; request rate, 5xx rate, p95, p99, Loki logs `{service_name=~"$service"} | json`, Tempo TraceQL traces panel), `infra/grafana/provisioning/dashboards/dashboards.yml` → folder Demo; `README.md` (venv/install/test commands, Milestone 1 URLs, `scripts/smoke.sh`); `CLAUDE.md` repo layout update (add `scripts/`); tick this tracker.
-- **Tests:** extend `tests/test_infra_configs.py` — dashboard JSON parses; referenced datasource UIDs exist; provisioning points at a real dashboard path.
-- **Done when:** every Milestone 1 definition-of-done box at the top is ticked; `pytest -q` and `ruff check services tests` pass.
+### M1.11 — Dashboard, docs, acceptance ✅
+- **Build:** `infra/grafana/dashboards/milestone-1.json` (15m range, 5s refresh, `$service` variable; request rate, 5xx rate, p95, p99, Loki logs `{service_name=~"$service"} | json`, Tempo TraceQL traces panel), `infra/grafana/provisioning/dashboards/dashboards.yml` → folder Demo (`/var/lib/grafana/dashboards`); compose mounts `infra/grafana/dashboards` read-only into Grafana; `README.md` (venv/install/test commands, Milestone 1 URLs, `scripts/smoke.sh`); `CLAUDE.md` repo layout adds `scripts/`; `scripts/smoke.sh` now tracked with the executable bit.
+- **Tests:** extend `tests/test_infra_configs.py` — dashboard JSON parses; referenced datasource UIDs exist; provisioning path matches the compose mount; dashboard uid/refresh/range, `$service` variable and all six panels.
+- **Verified:** all 7 containers up; Prometheus has both services' counter and histogram; dashboard provisioned in Grafana folder Demo; `scripts/smoke.sh` phases 1–3 pass; `pytest -q` 53 passed; `ruff check services tests` clean.
+- **Done when:** every Milestone 1 definition-of-done box at the top is ticked.
 
 ## Working rules for these steps
 - One step per change set; tests first within each step.
@@ -134,7 +135,8 @@ Milestone 1 was too large to track as one item, so it is broken into eleven step
 - [x] **M1.8 — Prometheus + Grafana datasource**
 - [x] **M1.9 — Loki + Alloy logs**
 - [x] **M1.10 — Tempo + Alloy traces**
-- [ ] **M1.11 — Dashboard, docs, acceptance** (start here)
+- [x] **M1.11 — Dashboard, docs, acceptance**
+- **Next:** Phase 3 — expand and break things (not yet planned).
 
 ## Open questions / blockers
 - None blocking the plan itself.

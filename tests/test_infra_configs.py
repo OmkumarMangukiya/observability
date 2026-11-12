@@ -1,4 +1,4 @@
-"""Tests for infra configuration files (M1.8, M1.9, M1.10)."""
+"""Tests for infra configuration files (M1.8, M1.9, M1.10, M1.11)."""
 
 import json
 from pathlib import Path
@@ -15,6 +15,10 @@ ALLOY_CONFIG_PATH = REPO_ROOT / "infra" / "alloy" / "config.alloy"
 DATASOURCES_PATH = (
     REPO_ROOT / "infra" / "grafana" / "provisioning" / "datasources" / "datasources.yml"
 )
+DASHBOARDS_PROVISIONING_PATH = (
+    REPO_ROOT / "infra" / "grafana" / "provisioning" / "dashboards" / "dashboards.yml"
+)
+DASHBOARD_PATH = REPO_ROOT / "infra" / "grafana" / "dashboards" / "milestone-1.json"
 GRAFANA_DIR = REPO_ROOT / "infra" / "grafana"
 
 # System paths (Docker socket) have no relative form; everything else must be
@@ -332,3 +336,49 @@ def test_grafana_admin_password_comes_from_env() -> None:
     grafana = _load_compose()["services"]["grafana"]
     password = grafana["environment"]["GF_SECURITY_ADMIN_PASSWORD"]
     assert "${GF_ADMIN_PASSWORD" in password
+
+
+def test_dashboards_are_provisioned_from_the_mounted_folder() -> None:
+    """dashboards.yml points inside the container at the mounted dashboard folder."""
+    providers = _load_yaml(DASHBOARDS_PROVISIONING_PATH)["providers"]
+    assert providers, "dashboards.yml declares no providers"
+    provider = providers[0]
+    assert provider["folder"] == "Demo"
+    provider_path = provider["options"]["path"]
+    assert provider_path == "/var/lib/grafana/dashboards"
+
+    volume = f"./infra/grafana/dashboards:{provider_path}:ro"
+    grafana_volumes = [str(entry) for entry in _load_compose()["services"]["grafana"]["volumes"]]
+    assert volume in grafana_volumes, f"grafana does not mount {volume}"
+    assert DASHBOARD_PATH.is_file()
+
+
+def test_milestone_1_dashboard_has_the_required_panels() -> None:
+    """Dashboard is 15m/5s, has a $service variable and all six panels."""
+    assert DASHBOARD_PATH.is_file(), "missing dashboard JSON"
+    with DASHBOARD_PATH.open(encoding="utf-8") as handle:
+        dashboard = json.load(handle)
+
+    assert dashboard["uid"] == "milestone-1"
+    assert dashboard["refresh"] == "5s"
+    assert dashboard["time"] == {"from": "now-15m", "to": "now"}
+    assert any(variable["name"] == "service" for variable in dashboard["templating"]["list"])
+
+    panels = dashboard["panels"]
+    assert len(panels) == 6
+    assert {"logs", "traces"} <= {panel["type"] for panel in panels}
+
+    exprs = [
+        target["expr"]
+        for panel in panels
+        for target in panel.get("targets", [])
+        if "expr" in target
+    ]
+    assert any("rate(http_server_requests_total" in expr for expr in exprs)
+    assert any('http_response_status_code=~"5.."' in expr for expr in exprs)
+    assert any("histogram_quantile(0.95" in expr for expr in exprs)
+    assert any("histogram_quantile(0.99" in expr for expr in exprs)
+    assert any('{service_name=~"$service"}' in expr for expr in exprs)
+
+    queries = [target for panel in panels for target in panel.get("targets", [])]
+    assert any(query.get("queryType") == "traceql" for query in queries)
