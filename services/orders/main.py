@@ -8,6 +8,7 @@ from typing import Annotated
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
 
+from common.faults import init_faults
 from common.logging import get_logger
 from common.telemetry import init_observability
 
@@ -32,6 +33,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title="orders", lifespan=lifespan)
+init_faults(app)
 init_observability(app, "orders")
 
 

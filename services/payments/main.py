@@ -7,6 +7,7 @@ from itertools import count
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from common.faults import init_faults
 from common.telemetry import init_observability
 
 # Hard-coded in-memory store — persistence is out of scope.
@@ -18,6 +19,7 @@ _MIN_PROCESSING_SECONDS = 0.05
 _MAX_PROCESSING_SECONDS = 0.2
 
 app = FastAPI(title="payments")
+init_faults(app)
 init_observability(app, "payments")
 
 

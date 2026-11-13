@@ -35,7 +35,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 |---|---|---|
 | M3.1 | Payments service | ✅ |
 | M3.2 | Wire payments into gateway + compose | ✅ |
-| M3.3 | Fault-injection framework | ⬜ |
+| M3.3 | Fault-injection framework | ✅ |
 | M3.4 | Fault: slow endpoint | ⬜ |
 | M3.5 | Fault: random 500s | ⬜ |
 | M3.6 | Fault: dependency timeout | ⬜ |
@@ -53,7 +53,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** `tests/test_gateway.py` updated for the three-service flow; `tests/test_orders.py` updated for the payments dependency.
 - **Done when:** `curl localhost:8000/orders` produces a trace with gateway → orders → payments spans; `scripts/smoke.sh` passes; Grafana dashboard shows payments in the `$service` variable.
 
-### M3.3 — Fault-injection framework ⬜
+### M3.3 — Fault-injection framework ✅
 - **Build:** `services/common/faults.py` — a lightweight fault-injection middleware/module. Faults are toggled via environment variables (e.g., `FAULT_SLOW_ENDPOINT=true`, `FAULT_RANDOM_500S=0.3`) and/or an HTTP control endpoint `POST /faults` (JSON body `{"fault": "slow_endpoint", "enabled": true, "params": {...}}`), `GET /faults` (list active faults). The framework is imported and mounted by each service but does nothing unless a fault is activated. Each fault type is a pluggable function.
 - **Tests:** `tests/test_faults.py` — framework loads with no faults active; faults can be toggled on/off via env and HTTP; unknown fault names return 400.
 - **Done when:** tests pass; services start cleanly with no faults enabled; `GET /faults` returns empty list.
@@ -118,7 +118,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 ## In flight / Next
 - [x] **M3.1 — Payments service**
 - [x] **M3.2 — Wire payments into gateway + compose**
-- [ ] **M3.3 — Fault-injection framework**
+- [x] **M3.3 — Fault-injection framework**
 - [ ] **M3.4 — Fault: slow endpoint**
 - [ ] **M3.5 — Fault: random 500s**
 - [ ] **M3.6 — Fault: dependency timeout**

@@ -9,6 +9,7 @@ import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from common.faults import init_faults
 from common.logging import get_logger
 from common.telemetry import init_observability
 
@@ -27,6 +28,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title="gateway", lifespan=lifespan)
+init_faults(app)
 init_observability(app, "gateway")
 
 
