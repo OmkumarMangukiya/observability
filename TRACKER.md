@@ -1,4 +1,4 @@
-# Tracker — last updated 2026-11-12
+# Tracker — last updated 2026-11-13
 
 ## Phase status
 | Phase | Name | Status |
@@ -36,7 +36,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 | M3.1 | Payments service | ✅ |
 | M3.2 | Wire payments into gateway + compose | ✅ |
 | M3.3 | Fault-injection framework | ✅ |
-| M3.4 | Fault: slow endpoint | ⬜ |
+| M3.4 | Fault: slow endpoint | ✅ |
 | M3.5 | Fault: random 500s | ⬜ |
 | M3.6 | Fault: dependency timeout | ⬜ |
 | M3.7 | Fault: bad deploy / memory leak | ⬜ |
@@ -58,7 +58,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** `tests/test_faults.py` — framework loads with no faults active; faults can be toggled on/off via env and HTTP; unknown fault names return 400.
 - **Done when:** tests pass; services start cleanly with no faults enabled; `GET /faults` returns empty list.
 
-### M3.4 — Fault: slow endpoint ⬜
+### M3.4 — Fault: slow endpoint ✅
 - **Build:** When `FAULT_SLOW_ENDPOINT=true` (or toggled via HTTP), the payments `POST /payments/process` adds an artificial delay (configurable, default 2–5 s). This should cause p95/p99 latency to spike on the payments service and the gateway's upstream latency to increase.
 - **Tests:** `tests/test_fault_slow.py` — with fault active, response time exceeds the configured delay; with fault inactive, response time is under 500 ms; the latency histogram records the inflated duration.
 - **Done when:** tests pass; manually verifiable: activate fault, hit endpoint, see latency spike in Prometheus `http_server_request_duration_seconds_bucket`.
@@ -119,7 +119,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - [x] **M3.1 — Payments service**
 - [x] **M3.2 — Wire payments into gateway + compose**
 - [x] **M3.3 — Fault-injection framework**
-- [ ] **M3.4 — Fault: slow endpoint**
+- [x] **M3.4 — Fault: slow endpoint**
 - [ ] **M3.5 — Fault: random 500s**
 - [ ] **M3.6 — Fault: dependency timeout**
 - [ ] **M3.7 — Fault: bad deploy / memory leak**

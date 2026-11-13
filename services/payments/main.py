@@ -7,6 +7,7 @@ from itertools import count
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+import payments.faults  # noqa: F401  -- registers fault types before init_faults()
 from common.faults import init_faults
 from common.telemetry import init_observability
 
