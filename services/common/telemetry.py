@@ -14,7 +14,7 @@ from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from prometheus_client import CollectorRegistry, make_asgi_app
+from prometheus_client import CollectorRegistry, ProcessCollector, make_asgi_app
 
 from common.logging import configure_logging
 from common.middleware import RequestMetricsMiddleware
@@ -78,6 +78,8 @@ def build_resource(service: str) -> Resource:
 def _create_instruments(service: str) -> Instruments:
     """Create one service's meter provider, instruments and registry."""
     registry = CollectorRegistry()
+    # Standard process metrics (resident memory, CPU, fds), needed to see leaks.
+    ProcessCollector(registry=registry)
     reader = PrometheusMetricReader(
         registry=registry,
         scope_info_enabled=False,

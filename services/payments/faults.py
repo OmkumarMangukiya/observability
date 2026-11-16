@@ -1,5 +1,6 @@
-"""Payment-service fault scenarios (M3.4, M3.5, M3.6)."""
+"""Payment-service fault scenarios (M3.4, M3.5, M3.6, M3.7)."""
 
+import os
 import random
 import time
 from collections.abc import Mapping
@@ -7,18 +8,25 @@ from typing import Any
 
 from starlette.responses import JSONResponse, Response
 
-from common.faults import FaultRequest, register_fault
+from common.faults import FaultRequest, active_faults, register_fault
 from common.logging import get_logger
 
 _logger = get_logger(__name__)
 
 _PROCESS_METHOD = "POST"
 _PROCESS_PATH = "/payments/process"
+# Probes keep working under every fault, so the failure stays observable.
+_INFRA_PATHS = frozenset({"/healthz", "/metrics"})
 _DEFAULT_MIN_SECONDS = 2.0
 _DEFAULT_MAX_SECONDS = 5.0
 _DEFAULT_ERROR_RATE = 0.5
 # Longer than any caller waits, so the caller always times out first.
 _DEFAULT_HANG_SECONDS = 30.0
+_DEFAULT_LEAK_BYTES = 1024 * 1024
+_FAKE_GIT_SHA = "badc0de"
+
+# Nothing ever removes from this list — that is the leak.
+_leaked_memory: list[bytes] = []
 
 
 def _delay_seconds(params: Mapping[str, Any]) -> float:
@@ -107,3 +115,54 @@ def dependency_timeout(request: FaultRequest, params: Mapping[str, Any]) -> None
     )
     time.sleep(seconds)
     return None
+
+
+@register_fault(
+    "bad_deploy",
+    env_param="enabled",
+    description="Fail every application request with a 500 after a bad deploy.",
+)
+def bad_deploy(request: FaultRequest, params: Mapping[str, Any]) -> Response | None:
+    """Return a 500 for every real request; infra probes are left alone."""
+    if request.path in _INFRA_PATHS:
+        return None
+
+    _logger.info("fault_injected", fault="bad_deploy", path=request.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "bad deploy", "fault": "bad_deploy"},
+    )
+
+
+@register_fault(
+    "memory_leak",
+    env_param="bytes_per_request",
+    description="Retain memory on every request so RSS climbs.",
+)
+def memory_leak(request: FaultRequest, params: Mapping[str, Any]) -> None:
+    """Keep a chunk of bytes per request; nothing ever frees it."""
+    if request.path in _INFRA_PATHS:
+        return None
+
+    size = max(0, int(params.get("bytes_per_request", _DEFAULT_LEAK_BYTES)))
+    _leaked_memory.append(b"x" * size)
+    _logger.info(
+        "fault_injected",
+        fault="memory_leak",
+        path=request.path,
+        bytes=size,
+    )
+    return None
+
+
+def emit_deploy_marker() -> None:
+    """Log the deploy marker at startup, but only for the bad-deploy scenario."""
+    if "bad_deploy" not in active_faults():
+        return
+
+    _logger.info(
+        "deploy",
+        service="payments",
+        git_sha=os.environ.get("GIT_SHA", _FAKE_GIT_SHA),
+        fault="bad_deploy",
+    )

@@ -39,7 +39,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 | M3.4 | Fault: slow endpoint | ✅ |
 | M3.5 | Fault: random 500s | ✅ |
 | M3.6 | Fault: dependency timeout | ✅ |
-| M3.7 | Fault: bad deploy / memory leak | ⬜ |
+| M3.7 | Fault: bad deploy / memory leak | ✅ |
 | M3.8 | Alert rules + Alertmanager | ⬜ |
 | M3.9 | Smoke, docs, acceptance | ⬜ |
 
@@ -73,7 +73,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** `tests/test_fault_timeout.py` — with fault active, orders returns 502/504 within a reasonable client timeout; the error is logged with structured fields; the trace shows the timeout span.
 - **Done when:** tests pass; the trace in Tempo shows the timeout behavior.
 
-### M3.7 — Fault: bad deploy / memory leak ⬜
+### M3.7 — Fault: bad deploy / memory leak ✅
 - **Build:** Two faults:
   1. **Bad deploy:** When `FAULT_BAD_DEPLOY=true`, payments returns 500 for *all* requests (simulating a completely broken deploy). A deploy marker (structured log with `event=deploy`, `git_sha=<fake>`, `service=payments`) is emitted at startup so the agent can later correlate.
   2. **Memory leak:** When `FAULT_MEMORY_LEAK=true`, payments allocates memory on each request (e.g., appending to a growing list). Expose a `process_resident_memory_bytes` metric (or use the default process metrics from `prometheus_client`) so the leak is visible.
@@ -122,7 +122,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - [x] **M3.4 — Fault: slow endpoint**
 - [x] **M3.5 — Fault: random 500s**
 - [x] **M3.6 — Fault: dependency timeout**
-- [ ] **M3.7 — Fault: bad deploy / memory leak**
+- [x] **M3.7 — Fault: bad deploy / memory leak**
 - [ ] **M3.8 — Alert rules + Alertmanager**
 - [ ] **M3.9 — Smoke, docs, acceptance**
 - **Next:** Phase 4 — detection and localization by hand.

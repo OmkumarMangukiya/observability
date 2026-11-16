@@ -2,14 +2,18 @@
 
 import random
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from itertools import count
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-import payments.faults  # noqa: F401  -- registers fault types before init_faults()
 from common.faults import init_faults
 from common.telemetry import init_observability
+
+# Importing the module also registers its fault types before init_faults() runs.
+from payments.faults import emit_deploy_marker
 
 # Hard-coded in-memory store — persistence is out of scope.
 PAYMENTS: dict[str, dict[str, str | float]] = {}
@@ -19,7 +23,15 @@ _payment_ids = count(1)
 _MIN_PROCESSING_SECONDS = 0.05
 _MAX_PROCESSING_SECONDS = 0.2
 
-app = FastAPI(title="payments")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Emit the deploy marker when the process starts."""
+    emit_deploy_marker()
+    yield
+
+
+app = FastAPI(title="payments", lifespan=lifespan)
 init_faults(app)
 init_observability(app, "payments")
 
