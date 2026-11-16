@@ -38,7 +38,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 | M3.3 | Fault-injection framework | ✅ |
 | M3.4 | Fault: slow endpoint | ✅ |
 | M3.5 | Fault: random 500s | ✅ |
-| M3.6 | Fault: dependency timeout | ⬜ |
+| M3.6 | Fault: dependency timeout | ✅ |
 | M3.7 | Fault: bad deploy / memory leak | ⬜ |
 | M3.8 | Alert rules + Alertmanager | ⬜ |
 | M3.9 | Smoke, docs, acceptance | ⬜ |
@@ -68,7 +68,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** `tests/test_fault_500s.py` — with rate=1.0, every request is 500; with rate=0.0, no 500s; error responses include the fault marker in logs.
 - **Done when:** tests pass; the 5xx error rate panel in Grafana visibly increases when the fault is on.
 
-### M3.6 — Fault: dependency timeout ⬜
+### M3.6 — Fault: dependency timeout ✅
 - **Build:** When `FAULT_DEPENDENCY_TIMEOUT=true`, orders' call to payments hangs (payments delays indefinitely or past orders' client timeout). Orders should log `payments_call_failed` (same `{dependency}_call_failed` convention as gateway's `orders_call_failed`) and return 504 or 502. The trace should show the orders span waiting and eventually timing out.
 - **Tests:** `tests/test_fault_timeout.py` — with fault active, orders returns 502/504 within a reasonable client timeout; the error is logged with structured fields; the trace shows the timeout span.
 - **Done when:** tests pass; the trace in Tempo shows the timeout behavior.
@@ -121,7 +121,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - [x] **M3.3 — Fault-injection framework**
 - [x] **M3.4 — Fault: slow endpoint**
 - [x] **M3.5 — Fault: random 500s**
-- [ ] **M3.6 — Fault: dependency timeout**
+- [x] **M3.6 — Fault: dependency timeout**
 - [ ] **M3.7 — Fault: bad deploy / memory leak**
 - [ ] **M3.8 — Alert rules + Alertmanager**
 - [ ] **M3.9 — Smoke, docs, acceptance**

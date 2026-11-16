@@ -1,4 +1,4 @@
-"""Payment-service fault scenarios (M3.4, M3.5)."""
+"""Payment-service fault scenarios (M3.4, M3.5, M3.6)."""
 
 import random
 import time
@@ -17,6 +17,8 @@ _PROCESS_PATH = "/payments/process"
 _DEFAULT_MIN_SECONDS = 2.0
 _DEFAULT_MAX_SECONDS = 5.0
 _DEFAULT_ERROR_RATE = 0.5
+# Longer than any caller waits, so the caller always times out first.
+_DEFAULT_HANG_SECONDS = 30.0
 
 
 def _delay_seconds(params: Mapping[str, Any]) -> float:
@@ -84,3 +86,24 @@ def random_500s(request: FaultRequest, params: Mapping[str, Any]) -> Response | 
         status_code=500,
         content={"detail": "injected failure", "fault": "random_500s"},
     )
+
+
+@register_fault(
+    "dependency_timeout",
+    env_param="seconds",
+    description="Hang POST /payments/process past the caller's timeout.",
+)
+def dependency_timeout(request: FaultRequest, params: Mapping[str, Any]) -> None:
+    """Sleep long enough that the caller gives up; the real handler never runs."""
+    if request.method != _PROCESS_METHOD or request.path != _PROCESS_PATH:
+        return None
+
+    seconds = max(0.0, float(params.get("seconds", _DEFAULT_HANG_SECONDS)))
+    _logger.info(
+        "fault_injected",
+        fault="dependency_timeout",
+        path=request.path,
+        delay_seconds=round(seconds, 3),
+    )
+    time.sleep(seconds)
+    return None

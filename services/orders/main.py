@@ -15,6 +15,10 @@ from common.telemetry import init_observability
 # Where the payments service lives. Compose sets this; the default matches its service name.
 PAYMENTS_URL = os.environ.get("PAYMENTS_URL", "http://payments:8002")
 
+# How long orders waits for payments. Normal processing takes 50-200 ms, so this is
+# generous, while still giving up long before an injected dependency timeout ends.
+PAYMENTS_TIMEOUT_SECONDS = float(os.environ.get("PAYMENTS_TIMEOUT_SECONDS", "10"))
+
 # Hard-coded for Milestone 1 — a real store is out of scope.
 ORDERS: dict[str, dict[str, str | float]] = {
     "order-1": {"id": "order-1", "item": "keyboard", "status": "created", "amount": 89.99},
@@ -27,7 +31,7 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Keep one HTTP client for the whole process."""
-    with httpx.Client(base_url=PAYMENTS_URL) as client:
+    with httpx.Client(base_url=PAYMENTS_URL, timeout=PAYMENTS_TIMEOUT_SECONDS) as client:
         app.state.payments_client = client
         yield
 
@@ -53,8 +57,24 @@ def _with_payment(client: httpx.Client, order: dict[str, str | float]) -> dict[s
             json={"order_id": order["id"], "amount": order["amount"]},
         )
         response.raise_for_status()
+    except httpx.TimeoutException as exc:
+        logger.error(
+            "payments_call_failed",
+            dependency="payments",
+            order_id=order["id"],
+            reason="timeout",
+            timeout_seconds=getattr(client.timeout, "read", None),
+            error=str(exc),
+        )
+        raise HTTPException(status_code=504, detail="payments service timed out") from exc
     except httpx.HTTPError as exc:
-        logger.error("payments_call_failed", order_id=order["id"], error=str(exc))
+        logger.error(
+            "payments_call_failed",
+            dependency="payments",
+            order_id=order["id"],
+            reason="error",
+            error=str(exc),
+        )
         raise HTTPException(status_code=502, detail="payments service unavailable") from exc
     return {**order, "payment": response.json()}
 
