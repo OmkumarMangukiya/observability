@@ -1,4 +1,4 @@
-# Tracker — last updated 2026-11-13
+# Tracker — last updated 2026-11-16
 
 ## Phase status
 | Phase | Name | Status |
@@ -37,7 +37,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 | M3.2 | Wire payments into gateway + compose | ✅ |
 | M3.3 | Fault-injection framework | ✅ |
 | M3.4 | Fault: slow endpoint | ✅ |
-| M3.5 | Fault: random 500s | ⬜ |
+| M3.5 | Fault: random 500s | ✅ |
 | M3.6 | Fault: dependency timeout | ⬜ |
 | M3.7 | Fault: bad deploy / memory leak | ⬜ |
 | M3.8 | Alert rules + Alertmanager | ⬜ |
@@ -63,7 +63,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** `tests/test_fault_slow.py` — with fault active, response time exceeds the configured delay; with fault inactive, response time is under 500 ms; the latency histogram records the inflated duration.
 - **Done when:** tests pass; manually verifiable: activate fault, hit endpoint, see latency spike in Prometheus `http_server_request_duration_seconds_bucket`.
 
-### M3.5 — Fault: random 500s ⬜
+### M3.5 — Fault: random 500s ✅
 - **Build:** When `FAULT_RANDOM_500S=<rate>` (float 0–1, e.g., `0.3` for 30% errors), the payments service randomly returns HTTP 500 with a JSON error body and a structured `fault_injected` log line. The error counter `http_server_requests_total{http_response_status_code="500"}` increases.
 - **Tests:** `tests/test_fault_500s.py` — with rate=1.0, every request is 500; with rate=0.0, no 500s; error responses include the fault marker in logs.
 - **Done when:** tests pass; the 5xx error rate panel in Grafana visibly increases when the fault is on.
@@ -120,7 +120,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - [x] **M3.2 — Wire payments into gateway + compose**
 - [x] **M3.3 — Fault-injection framework**
 - [x] **M3.4 — Fault: slow endpoint**
-- [ ] **M3.5 — Fault: random 500s**
+- [x] **M3.5 — Fault: random 500s**
 - [ ] **M3.6 — Fault: dependency timeout**
 - [ ] **M3.7 — Fault: bad deploy / memory leak**
 - [ ] **M3.8 — Alert rules + Alertmanager**
