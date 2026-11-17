@@ -59,11 +59,37 @@ services:
       - "${PROMETHEUS_PORT:-9090}:9090"
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - prometheus-data:/prometheus
     depends_on:
       - gateway
       - orders
       - payments
+      - alertmanager
+
+  webhook-receiver:
+    image: observability-services:dev
+    build:
+      context: ./services
+      dockerfile: Dockerfile
+    command: ["uvicorn", "webhook_receiver.main:app", "--host", "0.0.0.0", "--port", "9000", "--no-access-log"]
+    ports:
+      - "${WEBHOOK_RECEIVER_PORT:-9000}:9000"
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    volumes:
+      - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    depends_on:
+      - webhook-receiver
 
   loki:
     image: grafana/loki:3.3.2
@@ -114,6 +140,7 @@ services:
 
 volumes:
   prometheus-data:
+  alertmanager-data:
   grafana-data:
   loki-data:
   tempo-data:

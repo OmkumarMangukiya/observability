@@ -40,7 +40,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 | M3.5 | Fault: random 500s | ✅ |
 | M3.6 | Fault: dependency timeout | ✅ |
 | M3.7 | Fault: bad deploy / memory leak | ✅ |
-| M3.8 | Alert rules + Alertmanager | ⬜ |
+| M3.8 | Alert rules + Alertmanager | ✅ |
 | M3.9 | Smoke, docs, acceptance | ⬜ |
 
 ### M3.1 — Payments service ✅
@@ -80,7 +80,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** `tests/test_fault_deploy.py` — bad deploy: all requests 500, deploy marker present in logs. `tests/test_fault_memory.py` — memory metric increases after N requests.
 - **Done when:** tests pass; both faults produce distinct, observable signals.
 
-### M3.8 — Alert rules + Alertmanager ⬜
+### M3.8 — Alert rules + Alertmanager ✅
 - **Build:** `infra/prometheus/alert-rules.yml` — alert rules:
   1. `HighErrorRate`: `rate(http_server_requests_total{http_response_status_code=~"5.."}[5m]) / rate(http_server_requests_total[5m]) > 0.05` for 1m.
   2. `HighLatencyP99`: `histogram_quantile(0.99, sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name)) > 2` for 1m.
@@ -123,7 +123,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - [x] **M3.5 — Fault: random 500s**
 - [x] **M3.6 — Fault: dependency timeout**
 - [x] **M3.7 — Fault: bad deploy / memory leak**
-- [ ] **M3.8 — Alert rules + Alertmanager**
+- [x] **M3.8 — Alert rules + Alertmanager**
 - [ ] **M3.9 — Smoke, docs, acceptance**
 - **Next:** Phase 4 — detection and localization by hand.
 

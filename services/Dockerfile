@@ -13,7 +13,8 @@ COPY common/ ./common/
 COPY gateway/ ./gateway/
 COPY orders/ ./orders/
 COPY payments/ ./payments/
+COPY webhook_receiver/ ./webhook_receiver/
 
-EXPOSE 8000 8001 8002
+EXPOSE 8000 8001 8002 9000
 
 CMD ["uvicorn", "gateway.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

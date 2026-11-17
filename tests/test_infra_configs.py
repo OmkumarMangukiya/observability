@@ -12,6 +12,8 @@ PROMETHEUS_CONFIG_PATH = REPO_ROOT / "infra" / "prometheus" / "prometheus.yml"
 LOKI_CONFIG_PATH = REPO_ROOT / "infra" / "loki" / "loki-config.yml"
 TEMPO_CONFIG_PATH = REPO_ROOT / "infra" / "tempo" / "tempo.yml"
 ALLOY_CONFIG_PATH = REPO_ROOT / "infra" / "alloy" / "config.alloy"
+ALERT_RULES_PATH = REPO_ROOT / "infra" / "prometheus" / "alert-rules.yml"
+ALERTMANAGER_CONFIG_PATH = REPO_ROOT / "infra" / "alertmanager" / "alertmanager.yml"
 DATASOURCES_PATH = (
     REPO_ROOT / "infra" / "grafana" / "provisioning" / "datasources" / "datasources.yml"
 )
@@ -45,6 +47,16 @@ def _datasources() -> list[dict[str, Any]]:
     datasources = _load_yaml(DATASOURCES_PATH).get("datasources", [])
     assert isinstance(datasources, list) and datasources, "no datasources provisioned"
     return datasources
+
+
+def _alerts_by_name() -> dict[str, dict[str, Any]]:
+    """Return alert rules keyed by alert name."""
+    return {
+        rule["alert"]: rule
+        for group in _load_yaml(ALERT_RULES_PATH).get("groups", [])
+        for rule in group.get("rules", [])
+        if "alert" in rule
+    }
 
 
 def _alloy_config() -> str:
@@ -88,6 +100,8 @@ def test_infra_yaml_files_parse() -> None:
         LOKI_CONFIG_PATH,
         TEMPO_CONFIG_PATH,
         DATASOURCES_PATH,
+        ALERT_RULES_PATH,
+        ALERTMANAGER_CONFIG_PATH,
     ):
         assert _load_yaml(path)
 
@@ -149,6 +163,71 @@ def test_prometheus_targets_match_compose_services() -> None:
         assert port in _container_ports(services[host]), (
             f"target {target} does not match a published container port"
         )
+
+
+def test_alert_rules_define_error_latency_and_down_alerts() -> None:
+    """The three service-health alerts exist with the documented thresholds."""
+    alerts = _alerts_by_name()
+    assert {"HighErrorRate", "HighLatencyP99", "ServiceDown"} <= set(alerts)
+
+    error_rate = alerts["HighErrorRate"]
+    assert error_rate["for"] == "1m"
+    assert 'http_response_status_code=~"5.."' in error_rate["expr"]
+    assert "> 0.05" in error_rate["expr"]
+
+    latency = alerts["HighLatencyP99"]
+    assert latency["for"] == "1m"
+    assert "histogram_quantile(0.99" in latency["expr"]
+    assert "> 2" in latency["expr"]
+
+    down = alerts["ServiceDown"]
+    assert down["for"] == "30s"
+    assert down["expr"].strip() == "up == 0"
+
+
+def test_alertmanager_routes_alerts_to_the_webhook_receiver() -> None:
+    """Every alert goes to a webhook receiver at the documented URL."""
+    config = _load_yaml(ALERTMANAGER_CONFIG_PATH)
+    receiver_name = config["route"]["receiver"]
+    receivers = {receiver["name"]: receiver for receiver in config["receivers"]}
+    assert receiver_name in receivers, f"route points at unknown receiver {receiver_name}"
+
+    webhooks = receivers[receiver_name]["webhook_configs"]
+    assert webhooks[0]["url"] == "http://webhook-receiver:9000/webhook"
+
+
+def test_prometheus_loads_rules_and_alertmanager() -> None:
+    """Prometheus loads the rules file and sends alerts to Alertmanager."""
+    config = _load_yaml(PROMETHEUS_CONFIG_PATH)
+    assert any(str(path).endswith("alert-rules.yml") for path in config["rule_files"])
+
+    targets = [
+        target
+        for manager in config["alerting"]["alertmanagers"]
+        for static in manager.get("static_configs", [])
+        for target in static.get("targets", [])
+    ]
+    assert "alertmanager:9093" in targets
+
+    prometheus_volumes = [
+        str(volume) for volume in _load_compose()["services"]["prometheus"]["volumes"]
+    ]
+    rules_mount = "./infra/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro"
+    assert rules_mount in prometheus_volumes
+
+
+def test_compose_wires_alertmanager_and_webhook_receiver() -> None:
+    """Both services exist, publish their ports, and mount the config."""
+    services = _load_compose()["services"]
+    assert {"alertmanager", "webhook-receiver"} <= set(services)
+
+    assert "9093" in _container_ports(services["alertmanager"])
+    assert "9000" in _container_ports(services["webhook-receiver"])
+
+    alertmanager_volumes = [str(volume) for volume in services["alertmanager"]["volumes"]]
+    config_mount = "./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro"
+    assert config_mount in alertmanager_volumes
+    assert "webhook-receiver" in services["alertmanager"]["depends_on"]
 
 
 def test_loki_config_uses_single_binary_filesystem_storage() -> None:
@@ -297,6 +376,17 @@ def test_grafana_tempo_datasource_is_provisioned() -> None:
     assert datasource["type"] == "tempo"
     assert datasource["url"] == "http://tempo:3200"
     assert datasource.get("access") == "proxy"
+
+
+def test_grafana_alertmanager_datasource_is_provisioned() -> None:
+    """Alertmanager is provisioned with UID 'alertmanager', proxied."""
+    by_uid = {datasource.get("uid"): datasource for datasource in _datasources()}
+    assert "alertmanager" in by_uid, "datasource UID 'alertmanager' is missing"
+    datasource = by_uid["alertmanager"]
+    assert datasource["type"] == "alertmanager"
+    assert datasource["url"] == "http://alertmanager:9093"
+    assert datasource.get("access") == "proxy"
+    assert datasource["jsonData"]["implementation"] == "prometheus"
 
 
 def test_loki_logs_link_to_tempo_traces() -> None:
