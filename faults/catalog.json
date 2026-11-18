@@ -1,0 +1,87 @@
+{
+  "scenarios": [
+    {
+      "id": "random_500s",
+      "service": "payments",
+      "fault": "random_500s",
+      "params": {
+        "rate": 0.3
+      },
+      "traffic": {
+        "service": "gateway",
+        "method": "GET",
+        "path": "/orders",
+        "requests": 30,
+        "interval_seconds": 0.2
+      },
+      "expected_symptom": "About 30% of POST /payments/process calls return 500, so some GET /orders requests fail at the gateway with 502 while others succeed. HighErrorRate fires on payments.",
+      "expected_alert": "HighErrorRate"
+    },
+    {
+      "id": "bad_deploy",
+      "service": "payments",
+      "fault": "bad_deploy",
+      "params": {},
+      "traffic": {
+        "service": "gateway",
+        "method": "GET",
+        "path": "/orders",
+        "requests": 10,
+        "interval_seconds": 0.2
+      },
+      "expected_symptom": "Every application request to payments returns 500 and every GET /orders at the gateway returns 502. Loki holds a deploy marker with git_sha=badc0de. HighErrorRate fires.",
+      "expected_alert": "HighErrorRate"
+    },
+    {
+      "id": "slow_endpoint",
+      "service": "payments",
+      "fault": "slow_endpoint",
+      "params": {
+        "seconds": 3
+      },
+      "traffic": {
+        "service": "gateway",
+        "method": "GET",
+        "path": "/orders",
+        "requests": 4,
+        "interval_seconds": 0.5
+      },
+      "expected_symptom": "Each POST /payments/process takes 3s, so GET /orders takes about 6s at orders and the gateway. All requests still succeed. HighLatencyP99 fires on payments, orders and gateway.",
+      "expected_alert": "HighLatencyP99"
+    },
+    {
+      "id": "dependency_timeout",
+      "service": "payments",
+      "fault": "dependency_timeout",
+      "params": {
+        "seconds": 30
+      },
+      "traffic": {
+        "service": "gateway",
+        "method": "GET",
+        "path": "/orders",
+        "requests": 2,
+        "interval_seconds": 1.0
+      },
+      "expected_symptom": "Payments hangs for 30s, orders gives up after 10s and logs payments_call_failed with reason=timeout, and the gateway answers 504 after about 10s. HighLatencyP99 fires.",
+      "expected_alert": "HighLatencyP99"
+    },
+    {
+      "id": "memory_leak",
+      "service": "payments",
+      "fault": "memory_leak",
+      "params": {
+        "bytes_per_request": 1048576
+      },
+      "traffic": {
+        "service": "gateway",
+        "method": "GET",
+        "path": "/orders",
+        "requests": 50,
+        "interval_seconds": 0.05
+      },
+      "expected_symptom": "No alert fires. process_resident_memory_bytes{service_name=\"payments\"} climbs by about 2 MiB per GET /orders because each order leaks 1 MiB on its payments call.",
+      "expected_alert": null
+    }
+  ]
+}
