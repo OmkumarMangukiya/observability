@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# End-to-end pipeline check: one request's trace reaches both services' logs
-# (phase 1), Loki (phase 2), and Tempo (phase 3).
+# End-to-end pipeline check: one request's trace reaches all three services' logs
+# (phase 1), Loki (phase 2), and Tempo (phase 3). Phase 4 injects a fault, waits
+# for the alert to fire, and checks that the webhook receiver got it.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -55,7 +56,7 @@ printf 'smoke: PASS — phase 1 (trace %s in gateway, orders and payments logs)\
 
 # --- Phase 2 (M1.9): the same trace must reach Loki for all three services. ---
 loki_url="${LOKI_URL:-http://localhost:3100}"
-loki_timeout=30
+loki_timeout=60
 logql="{service_name=~\"gateway|orders|payments\"} |= \"${trace_id}\""
 
 loki_gateway=false
@@ -128,3 +129,100 @@ tempo_missing=()
   || fail "phase 3: trace ${trace_id} missing from Tempo for: ${tempo_missing[*]}"
 
 printf 'smoke: PASS — phase 3 (trace %s in Tempo for gateway, orders and payments)\n' "${trace_id}"
+
+# --- Phase 4 (M3.9): a fault raises an alert that reaches the webhook receiver. ---
+if [[ "${SKIP_FAULT_SMOKE:-0}" == "1" ]]; then
+  printf 'smoke: SKIP — phase 4 (fault smoke disabled by SKIP_FAULT_SMOKE=1)\n'
+else
+  payments_url="${PAYMENTS_URL:-http://localhost:8002}"
+  prometheus_url="${PROMETHEUS_URL:-http://localhost:9090}"
+  alert_timeout="${FAULT_ALERT_TIMEOUT_SECONDS:-180}"
+  clear_timeout="${FAULT_ALERT_CLEAR_TIMEOUT_SECONDS:-360}"
+
+  high_error_rate_firing() {
+    local alerts compact
+    alerts="$(curl -sS "${prometheus_url}/api/v1/alerts" 2>/dev/null || true)"
+    compact="$(printf '%s' "${alerts}" | tr -d ' \t\n')"
+    [[ "${compact}" == *'"alertname":"HighErrorRate"'*'"state":"firing"'* ]]
+  }
+
+  # Always turn the fault off, even when a check below fails.
+  fault_active=false
+  disable_fault() {
+    if [[ "${fault_active}" == true ]]; then
+      curl -sS -X POST -H 'content-type: application/json' \
+        -d '{"fault": "random_500s", "enabled": false}' \
+        "${payments_url}/faults" >/dev/null 2>&1 || true
+      fault_active=false
+    fi
+  }
+  trap disable_fault EXIT
+
+  # A previous run keeps HighErrorRate firing until its 5-minute rate window
+  # empties. Alertmanager would not resend inside repeat_interval, so wait for a
+  # clean slate before generating a fresh alert.
+  if high_error_rate_firing; then
+    printf 'smoke: HighErrorRate is still firing from an earlier run; waiting up to %ss...\n' "${clear_timeout}"
+    clear_deadline=$((SECONDS + clear_timeout))
+    while (( SECONDS < clear_deadline )) && high_error_rate_firing; do
+      sleep 10
+    done
+    if high_error_rate_firing; then
+      fail "phase 4: HighErrorRate still firing after ${clear_timeout}s; rerun later or set SKIP_FAULT_SMOKE=1"
+    fi
+  fi
+
+  # Remember how much the receiver logged so old alerts cannot pass the check.
+  webhook_before="$({ docker compose logs webhook-receiver 2>/dev/null || true; } \
+    | wc -l | tr -d ' ')"
+
+  curl -sS -X POST -H 'content-type: application/json' \
+    -d '{"fault": "random_500s", "enabled": true, "params": {"rate": 1.0}}' \
+    "${payments_url}/faults" >/dev/null \
+    || fail "phase 4: could not enable random_500s on payments"
+  fault_active=true
+
+  status="$(curl -sS -o /dev/null -w '%{http_code}' "${base_url}/orders" || true)"
+  [[ "${status}" == "502" ]] \
+    || fail "phase 4: with random_500s on, GET /orders returned ${status}, expected 502"
+
+  fired=false
+  deadline=$((SECONDS + alert_timeout))
+  while (( SECONDS < deadline )); do
+    alerts="$(curl -sS "${prometheus_url}/api/v1/alerts" 2>/dev/null || true)"
+    compact="$(printf '%s' "${alerts}" | tr -d ' \t\n')"
+    if [[ "${compact}" == *'"alertname":"HighErrorRate"'*'"state":"firing"'* ]]; then
+      fired=true
+      break
+    fi
+    # Keep failing traffic flowing so the 5-minute error ratio stays above 5%.
+    curl -sS -o /dev/null "${base_url}/orders" 2>/dev/null || true
+    sleep 5
+  done
+  [[ "${fired}" == true ]] \
+    || fail "phase 4: HighErrorRate did not reach FIRING within ${alert_timeout}s"
+
+  delivered=false
+  deadline=$((SECONDS + 30))
+  while (( SECONDS < deadline )); do
+    new_logs="$({ docker compose logs webhook-receiver 2>/dev/null || true; } \
+      | tail -n +"$((webhook_before + 1))")"
+    compact_logs="$(printf '%s' "${new_logs}" | tr -d ' \t\n')"
+    if [[ "${compact_logs}" == *alert_received* \
+      && "${compact_logs}" == *'"alertname":"HighErrorRate"'* \
+      && "${compact_logs}" == *'"status":"firing"'* ]]; then
+      delivered=true
+      break
+    fi
+    sleep 2
+  done
+  [[ "${delivered}" == true ]] \
+    || fail "phase 4: webhook-receiver never logged the HighErrorRate alert"
+
+  disable_fault
+  status="$(curl -sS -o /dev/null -w '%{http_code}' "${base_url}/orders" || true)"
+  [[ "${status}" == "200" ]] \
+    || fail "phase 4: after disabling the fault, GET /orders returned ${status}, expected 200"
+
+  printf 'smoke: PASS — phase 4 (random_500s → HighErrorRate → webhook-receiver, then recovery)\n'
+fi

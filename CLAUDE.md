@@ -29,7 +29,8 @@ Agent (raw Python API loop) → root-cause report
 CLAUDE.md
 docker-compose.yml
 .env.example              # never commit .env
-services/{gateway,orders,payments}/
+services/{gateway,orders,payments,webhook_receiver}/
+services/common/          # shared telemetry, logging, fault framework
 agent/loop.py             # raw API agent loop
 agent/tools/              # Python tool functions
 agent/prompts/            # prompt templates
@@ -48,6 +49,7 @@ docker compose down
 docker compose logs -f orders   # tail one service
 pytest tests/                   # run tests
 ruff check . && ruff format .   # lint + format
+scripts/smoke.sh                # end-to-end check (logs, Loki, Tempo, alert path)
 ```
 
 ## Code Conventions
@@ -61,6 +63,19 @@ ruff check . && ruff format .   # lint + format
 - **Naming:** `snake_case` functions/vars, `PascalCase` classes, Google-style docstrings.
 - **Logging:** structlog — never `print()`. Include `trace_id` in request context.
 - **Paths:** all Linux paths (WSL2). Never use Windows paths in code or configs.
+
+## Fault Injection
+
+- Framework lives in `services/common/faults.py`. A service calls `init_faults(app)`
+  **before** `init_observability(app, ...)`, so metrics/traces still measure injected
+  responses and delays.
+- Fault types live in `services/<service>/faults.py` and register with
+  `@register_fault("name", env_param=..., description=...)`.
+- Turn one on with env `FAULT_<NAME>` (`true`/`false`, a number, or JSON params,
+  e.g. `FAULT_RANDOM_500S=0.3`) or `POST /faults` with
+  `{"fault": "random_500s", "enabled": true, "params": {"rate": 0.3}}`.
+- `GET /faults` lists active faults. `/faults`, `/healthz`, and `/metrics` are
+  never faulted, so the off switch and probes always work.
 
 ## Rules
 

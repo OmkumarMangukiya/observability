@@ -119,12 +119,86 @@ scripts/smoke.sh
 The script makes one request with a synthetic trace ID and checks the same ID
 travels through all three phases:
 
-1. the `gateway` and `orders` logs (`docker compose logs`),
+1. the `gateway`, `orders`, and `payments` logs (`docker compose logs`),
 2. Loki,
-3. Tempo, with spans from both services.
+3. Tempo, with spans from all three services.
 
-It polls each store for up to 30s, because Alloy ships logs and traces
-asynchronously, and exits non-zero naming the failed phase.
+Phase 4 then turns on the `random_500s` fault on payments, waits for the
+`HighErrorRate` alert to fire, and checks the webhook receiver logged it. It
+polls each store and Prometheus for up to 60s/3min, because Alloy ships
+asynchronously and the alert needs a 1-minute pending period. If a previous run
+left the alert firing, phase 4 waits up to 6 minutes for the 5-minute error
+window to clear (Alertmanager would not resend sooner). Exits non-zero naming
+the failed phase. Skip the slow fault check with `SKIP_FAULT_SMOKE=1`.
+
+## 🧪 Phase 3 — Expand and Break Things
+
+Phase 3 adds the payments service, a fault-injection framework, and alerting.
+A request now travels `gateway → orders → payments`.
+
+| What | URL |
+|---|---|
+| Payments service | http://localhost:8002/healthz |
+| Alertmanager | http://localhost:9093 |
+| Webhook receiver | http://localhost:9000/webhook |
+
+### Fault injection
+
+Every service mounts the shared fault framework (`services/common/faults.py`).
+Faults do nothing until you turn one on, either with an environment variable or
+through the control endpoint.
+
+| Fault | Env var | Params | Effect |
+|---|---|---|---|
+| `slow_endpoint` | `FAULT_SLOW_ENDPOINT=true` | `seconds` or `min_seconds` / `max_seconds` | sleeps before `POST /payments/process` |
+| `random_500s` | `FAULT_RANDOM_500S=0.3` | `rate` (0–1) | returns 500 for that share of process requests |
+| `dependency_timeout` | `FAULT_DEPENDENCY_TIMEOUT=true` | `seconds` (default 30) | hangs past the caller's 10s timeout |
+| `bad_deploy` | `FAULT_BAD_DEPLOY=true` | none | every application request returns 500; startup logs a `deploy` marker |
+| `memory_leak` | `FAULT_MEMORY_LEAK=true` | `bytes_per_request` | keeps bytes on every request, so RSS climbs |
+
+Env values can be `true` / `false`, a number, or JSON params, for example
+`FAULT_SLOW_ENDPOINT='{"seconds": 3}'`.
+
+Toggles over HTTP (payments listens on port 8002):
+
+```bash
+# list active faults
+curl -s localhost:8002/faults
+
+# turn random_500s on for 50% of payment requests
+curl -s -X POST localhost:8002/faults \
+  -H 'content-type: application/json' \
+  -d '{"fault": "random_500s", "enabled": true, "params": {"rate": 0.5}}'
+
+# turn it off
+curl -s -X POST localhost:8002/faults \
+  -H 'content-type: application/json' \
+  -d '{"fault": "random_500s", "enabled": false}'
+```
+
+`/faults`, `/healthz`, and `/metrics` are never faulted, so you can always list
+faults or turn one off.
+
+### Alerts
+
+Prometheus loads three rules from `infra/prometheus/alert-rules.yml`:
+
+- `HighErrorRate` — more than 5% of requests are 5xx for 1 minute.
+- `HighLatencyP99` — p99 latency above 2s for 1 minute.
+- `ServiceDown` — a scrape target is down for 30s.
+
+Alertmanager groups them and posts them to the webhook receiver, which logs each
+payload as structured JSON:
+
+```bash
+docker compose logs -f webhook-receiver
+```
+
+- Prometheus alert states: http://localhost:9090/alerts
+- Alertmanager UI: http://localhost:9093
+
+The Grafana dashboard shows a **5xx error ratio** panel with the alert's 5%
+threshold marked, so you can see the same signal the alert watches.
 
 ## 🗺️ Roadmap & Detailed Plan
 See [`docs/observability-agent-plan.md`](docs/observability-agent-plan.md) for detailed architecture, phased milestones, concepts, and eval designs.

@@ -1,4 +1,4 @@
-# Tracker — last updated 2026-11-16
+# Tracker — last updated 2026-11-17
 
 ## Phase status
 | Phase | Name | Status |
@@ -6,7 +6,7 @@
 | 0 | Concepts | ✅ Done |
 | 1 | Repo skeleton + CLAUDE.md | ✅ Done |
 | 2 | Milestone 1 — one request fully visible | ✅ Done (M1.1–M1.11) |
-| 3 | Expand and break things | 🔄 In progress (M3.1–M3.9) |
+| 3 | Expand and break things | ✅ Done (M3.1–M3.9) |
 | 4 | Detection and localization by hand | ⬜ |
 | 5 | Agent tools | ⬜ |
 | 6 | Raw agent loop | ⬜ |
@@ -18,15 +18,15 @@
 Phase 3 adds the third service (payments), a fault-injection framework, multiple failure scenarios, and alerting. Each step is independently verifiable and should land as one reviewable change set.
 
 **Definition of done (whole phase):**
-- [ ] `docker compose up -d --build` brings up gateway, orders, payments, and all infra
-- [ ] `curl localhost:8000/orders` triggers gateway → orders → payments chain; the same `trace_id` appears in all three services' JSON logs
-- [ ] Prometheus has `http_server_requests_total` and `http_server_request_duration_seconds_bucket` for all three services
-- [ ] Tempo shows traces with gateway → orders → payments spans
-- [ ] Each fault scenario is activatable via env var / HTTP toggle and produces a visible signal in metrics, logs, and/or traces
-- [ ] Alertmanager fires alerts to a webhook receiver when fault scenarios are active
-- [ ] Grafana dashboard updated to include the payments service
-- [ ] `scripts/smoke.sh` passes with all three services; fault-injection smoke tests pass
-- [ ] `pytest` and `ruff check` pass
+- [x] `docker compose up -d --build` brings up gateway, orders, payments, and all infra
+- [x] `curl localhost:8000/orders` triggers gateway → orders → payments chain; the same `trace_id` appears in all three services' JSON logs
+- [x] Prometheus has `http_server_requests_total` and `http_server_request_duration_seconds_bucket` for all three services
+- [x] Tempo shows traces with gateway → orders → payments spans
+- [x] Each fault scenario is activatable via env var / HTTP toggle and produces a visible signal in metrics, logs, and/or traces
+- [x] Alertmanager fires alerts to a webhook receiver when fault scenarios are active
+- [x] Grafana dashboard updated to include the payments service
+- [x] `scripts/smoke.sh` passes with all three services; fault-injection smoke tests pass
+- [x] `pytest` and `ruff check` pass
 
 **Out of scope (do not build in Phase 3):** manual investigation playbooks (Phase 4), agent tools (Phase 5), the agent loop (Phase 6), evals (Phase 7), Kubernetes, PagerDuty integration.
 
@@ -41,7 +41,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 | M3.6 | Fault: dependency timeout | ✅ |
 | M3.7 | Fault: bad deploy / memory leak | ✅ |
 | M3.8 | Alert rules + Alertmanager | ✅ |
-| M3.9 | Smoke, docs, acceptance | ⬜ |
+| M3.9 | Smoke, docs, acceptance | ✅ |
 
 ### M3.1 — Payments service ✅
 - **Build:** `services/payments/main.py` — in-memory payment records; `POST /payments/process` (accepts `order_id`, `amount`; returns payment confirmation with random processing time 50–200 ms), `GET /payments/{id}` (404 for unknown), `GET /healthz`; `init_observability(app, "payments")`. Reuses `services/common/` telemetry, logging, middleware.
@@ -91,7 +91,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** extend `tests/test_infra_configs.py` — alert rules YAML parses; Alertmanager config parses; receiver endpoint is configured; Prometheus config references the rules file and Alertmanager.
 - **Done when:** with a fault active, Prometheus shows the alert in PENDING → FIRING; Alertmanager routes it to the webhook receiver; the receiver logs the alert payload.
 
-### M3.9 — Smoke, docs, acceptance ⬜
+### M3.9 — Smoke, docs, acceptance ✅
 - **Build:**
   - `scripts/smoke.sh` updated: add phase 4 — verify three-service trace (gateway + orders + payments spans). Optionally add a fault-injection smoke phase that toggles a fault and checks the alert fires.
   - Dashboard `milestone-1.json` updated (or new `phase-3.json`): `$service` variable now includes `payments`; panels still work for all three services.
@@ -100,6 +100,13 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - **Tests:** extend `tests/test_infra_configs.py` for any new configs.
 - **Verified:** all containers up; three-service traces in Tempo; each fault scenario produces its expected signal; alerts fire and reach the webhook receiver; `scripts/smoke.sh` all phases pass; `pytest -q` passes; `ruff check` clean.
 - **Done when:** every Phase 3 definition-of-done box at the top is ticked.
+- **Landed:** smoke phase 4 (random_500s → `HighErrorRate` → webhook receiver → recovery), error-ratio dashboard panel, README/CLAUDE docs, `SKIP_FAULT_SMOKE=1` escape hatch. Phase 4 waits out a stale alert; `smoke.sh` is executable in git.
+- **Found and fixed during acceptance:**
+  - Stale dashboard test expected a `traces` panel; commit `78b6152` intentionally uses a table for TraceQL search results.
+  - `HighErrorRate` divided each 5xx series by itself (ratio always 1.0). Both sides now aggregate `by (service_name)`, so it measures the real 5% error share per service.
+  - Smoke's Loki wait raised to 60s: on a cold stack, gateway's first logs can take >30s to reach Loki.
+  - Phase 4 waits for an earlier `HighErrorRate` to clear first: Alertmanager's `repeat_interval` is 1h and would not resend.
+  - `scripts/smoke.sh` was tracked as non-executable, so `scripts/smoke.sh` failed with "Permission denied".
 
 ## Working rules for these steps
 - One step per change set; tests first within each step.
@@ -114,6 +121,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - [x] Phase 1: repo skeleton + CLAUDE.md + initial folder layout
 - [x] Phase 0: observability concepts
 - [x] Phase 2: Milestone 1 — one request fully visible (M1.1–M1.11)
+- [x] Phase 3: Expand and break things (M3.1–M3.9)
 
 ## In flight / Next
 - [x] **M3.1 — Payments service**
@@ -124,7 +132,7 @@ Phase 3 adds the third service (payments), a fault-injection framework, multiple
 - [x] **M3.6 — Fault: dependency timeout**
 - [x] **M3.7 — Fault: bad deploy / memory leak**
 - [x] **M3.8 — Alert rules + Alertmanager**
-- [ ] **M3.9 — Smoke, docs, acceptance**
+- [x] **M3.9 — Smoke, docs, acceptance**
 - **Next:** Phase 4 — detection and localization by hand.
 
 ## Open questions / blockers

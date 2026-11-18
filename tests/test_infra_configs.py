@@ -1,4 +1,4 @@
-"""Tests for infra configuration files (M1.8, M1.9, M1.10, M1.11)."""
+"""Tests for infra configuration files (M1.8-M1.11, M3.8, M3.9)."""
 
 import json
 from pathlib import Path
@@ -22,6 +22,7 @@ DASHBOARDS_PROVISIONING_PATH = (
 )
 DASHBOARD_PATH = REPO_ROOT / "infra" / "grafana" / "dashboards" / "milestone-1.json"
 GRAFANA_DIR = REPO_ROOT / "infra" / "grafana"
+SMOKE_PATH = REPO_ROOT / "scripts" / "smoke.sh"
 
 # System paths (Docker socket) have no relative form; everything else must be
 # relative so the repo works from any checkout location.
@@ -173,6 +174,9 @@ def test_alert_rules_define_error_latency_and_down_alerts() -> None:
     error_rate = alerts["HighErrorRate"]
     assert error_rate["for"] == "1m"
     assert 'http_response_status_code=~"5.."' in error_rate["expr"]
+    # Both sides must be aggregated per service; otherwise the 5xx series is
+    # divided by itself and the ratio is always 1.0.
+    assert "sum by (service_name)" in error_rate["expr"]
     assert "> 0.05" in error_rate["expr"]
 
     latency = alerts["HighLatencyP99"]
@@ -444,7 +448,7 @@ def test_dashboards_are_provisioned_from_the_mounted_folder() -> None:
 
 
 def test_milestone_1_dashboard_has_the_required_panels() -> None:
-    """Dashboard is 15m/5s, has a $service variable and all six panels."""
+    """Dashboard is 15m/5s, has a $service variable and all seven panels."""
     assert DASHBOARD_PATH.is_file(), "missing dashboard JSON"
     with DASHBOARD_PATH.open(encoding="utf-8") as handle:
         dashboard = json.load(handle)
@@ -455,8 +459,14 @@ def test_milestone_1_dashboard_has_the_required_panels() -> None:
     assert any(variable["name"] == "service" for variable in dashboard["templating"]["list"])
 
     panels = dashboard["panels"]
-    assert len(panels) == 6
-    assert {"logs", "traces"} <= {panel["type"] for panel in panels}
+    assert len(panels) == 7
+    assert "logs" in {panel["type"] for panel in panels}
+
+    # Commit 78b6152 renders TraceQL search results in a table on purpose:
+    # Grafana's traces panel only accepts a single trace.
+    trace_panels = [panel for panel in panels if panel.get("title") == "Traces"]
+    assert trace_panels, "dashboard has no Traces panel"
+    assert trace_panels[0]["type"] == "table"
 
     exprs = [
         target["expr"]
@@ -472,3 +482,52 @@ def test_milestone_1_dashboard_has_the_required_panels() -> None:
 
     queries = [target for panel in panels for target in panel.get("targets", [])]
     assert any(query.get("queryType") == "traceql" for query in queries)
+
+
+def test_dashboard_shows_the_error_ratio_the_alert_watches() -> None:
+    """The new ratio panel uses $service and marks the 5% alert threshold."""
+    with DASHBOARD_PATH.open(encoding="utf-8") as handle:
+        dashboard = json.load(handle)
+
+    panels = [
+        panel
+        for panel in dashboard["panels"]
+        if panel.get("title") == "5xx error ratio (alert > 5%)"
+    ]
+    assert panels, "dashboard has no 5xx error ratio panel"
+    panel = panels[0]
+    assert any(
+        'http_response_status_code=~"5.."' in target.get("expr", "") for target in panel["targets"]
+    )
+    assert "$service" in panel["targets"][0]["expr"]
+
+    steps = panel["fieldConfig"]["defaults"]["thresholds"]["steps"]
+    assert any(step["value"] == 0.05 and step["color"] == "red" for step in steps)
+
+
+def test_dashboard_service_variable_picks_up_every_service() -> None:
+    """The variable is a label query, so a new service (payments) appears automatically."""
+    with DASHBOARD_PATH.open(encoding="utf-8") as handle:
+        dashboard = json.load(handle)
+
+    variable = next(
+        (variable for variable in dashboard["templating"]["list"] if variable["name"] == "service"),
+        None,
+    )
+    assert variable is not None, "dashboard has no $service variable"
+    expected = "label_values(http_server_requests_total, service_name)"
+    assert variable["definition"] == expected
+    assert variable["query"]["query"] == expected
+
+
+def test_smoke_script_covers_the_fault_alert_path() -> None:
+    """Phase 4 enables a fault, waits for the alert, and checks the webhook receiver."""
+    assert SMOKE_PATH.is_file(), "missing scripts/smoke.sh"
+    text = SMOKE_PATH.read_text(encoding="utf-8")
+
+    assert "phase 4" in text
+    assert '"fault": "random_500s"' in text
+    assert "/api/v1/alerts" in text
+    assert "HighErrorRate" in text
+    assert "webhook-receiver" in text
+    assert "alert_received" in text
