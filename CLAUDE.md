@@ -92,3 +92,11 @@ scripts/smoke.sh                # end-to-end check (logs, Loki, Tempo, alert pat
    - Do not call Edit, Write, or any file-modifying command until I approve.
 8. **Specs/Trackers contain functional intent, not copy-paste code:** Any code snippets or formulas in `TRACKER.md` or prompts are conceptual sketches. You are responsible for ensuring correct domain semantics (e.g., PromQL label matching, SQL index usage, regex escaping) rather than copying them verbatim.
 9. **Test behavior, not substrings:** Never verify logic, queries, or configs using substring assertions (e.g., `assert "..." in expr`); always test functional behavior and evaluation results using domain harnesses (e.g., `promtool test rules`) or executable assertions.
+10. **Git Commits**
+Format: `<type>(<scope>): <summary>` (lowercase, imperative mood, no ending period, <72 chars).
+- `feat:` new feature
+- `fix:` bug fix
+- `docs:` documentation updates
+- `refactor:` code restructuring without feature/bug changes
+- `test:` adding or updating tests
+- `chore:` maintenance, dependencies, or configs
