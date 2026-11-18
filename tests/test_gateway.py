@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
 from fastapi.testclient import TestClient
+from structlog.testing import capture_logs
 
 from gateway.main import app, get_orders_client
 
@@ -65,6 +66,34 @@ def test_orders_connect_error_becomes_502() -> None:
         response = client.get("/orders")
 
     assert response.status_code == 502
+
+
+def test_orders_timeout_becomes_504() -> None:
+    """When orders does not answer in time, the gateway answers 504, not 502."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("orders timed out", request=request)
+
+    with orders_action(handler):
+        with capture_logs() as logs:
+            response = client.get("/orders")
+
+    assert response.status_code == 504
+    assert response.json() == {"detail": "orders service timed out"}
+    failures = [entry for entry in logs if entry["event"] == "orders_call_failed"]
+    assert len(failures) == 1
+    assert failures[0]["reason"] == "timeout"
+
+
+def test_orders_504_is_passed_through() -> None:
+    """Orders' own timeout keeps its 504 status and body instead of becoming 502."""
+    upstream = {"detail": "payments service timed out"}
+
+    with orders_action(lambda request: httpx.Response(504, json=upstream)):
+        response = client.get("/orders")
+
+    assert response.status_code == 504
+    assert response.json() == upstream
 
 
 def test_traceparent_is_forwarded_to_orders() -> None:

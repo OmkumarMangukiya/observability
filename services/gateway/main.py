@@ -16,13 +16,18 @@ from common.telemetry import init_observability
 # Where the orders service lives. Compose sets this; the default matches its service name.
 ORDERS_URL = os.environ.get("ORDERS_URL", "http://orders:8001")
 
+# How long gateway waits for orders. Must stay above orders' own 10s
+# PAYMENTS_TIMEOUT_SECONDS, with room for its sequential payment calls, so a
+# downstream timeout reaches the caller as a 504 instead of a gateway 502.
+ORDERS_TIMEOUT_SECONDS = float(os.environ.get("ORDERS_TIMEOUT_SECONDS", "15"))
+
 logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Keep one HTTP client for the whole process."""
-    with httpx.Client(base_url=ORDERS_URL) as client:
+    with httpx.Client(base_url=ORDERS_URL, timeout=ORDERS_TIMEOUT_SECONDS) as client:
         app.state.orders_client = client
         yield
 
@@ -41,11 +46,24 @@ OrdersClient = Annotated[httpx.Client, Depends(get_orders_client)]
 
 
 def _forward(client: httpx.Client, path: str) -> JSONResponse:
-    """Call orders and mirror its status and JSON body, or answer 502 on no answer."""
+    """Call orders and mirror its status and JSON body.
+
+    A timeout is the gateway's own 504; any other transport failure means orders
+    could not answer at all, which is a 502.
+    """
     try:
         response = client.get(path)
+    except httpx.TimeoutException as exc:
+        logger.error(
+            "orders_call_failed",
+            path=path,
+            reason="timeout",
+            timeout_seconds=ORDERS_TIMEOUT_SECONDS,
+            error=str(exc),
+        )
+        return JSONResponse(status_code=504, content={"detail": "orders service timed out"})
     except httpx.TransportError as exc:
-        logger.error("orders_call_failed", path=path, error=str(exc))
+        logger.error("orders_call_failed", path=path, reason="error", error=str(exc))
         return JSONResponse(status_code=502, content={"detail": "orders service unavailable"})
     return JSONResponse(status_code=response.status_code, content=response.json())
 
